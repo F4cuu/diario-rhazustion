@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diario de Rhazustión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <div id="escena">
+
+    <!-- ===== El escritorio (decoración) ===== -->
+    <div class="escritorio">
+      <div class="mapa">
+        <svg viewBox="0 0 420 300" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M30 60 C 80 20, 140 70, 190 40 S 300 30, 350 70 S 400 160, 360 210 S 250 270, 180 250 S 60 260, 40 200 S 0 110, 30 60 Z"
+                fill="none" stroke="#6b4a2b" stroke-width="2.5" opacity=".7"/>
+          <path d="M90 190 C 130 150, 160 170, 200 130 S 270 110, 300 90" fill="none"
+                stroke="#8a2a1a" stroke-width="2.5" stroke-dasharray="7 7" opacity=".8"/>
+          <path d="M292 80 l16 16 M308 80 l-16 16" stroke="#8a2a1a" stroke-width="3.5"/>
+          <circle cx="120" cy="110" r="10" fill="none" stroke="#6b4a2b" stroke-width="2" opacity=".6"/>
+          <path d="M230 200 l10 -18 l10 18 Z M250 200 l10 -14 l10 14 Z" fill="none" stroke="#6b4a2b" stroke-width="2" opacity=".6"/>
+        </svg>
+      </div>
+
+      <div class="vela">
+        <div class="halo"></div>
+        <div class="plato"></div>
+        <div class="cera"></div>
+        <div class="mecha"></div>
+        <div class="llama"></div>
+      </div>
+
+      <svg class="dado" viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="50,4 90,27 90,73 50,96 10,73 10,27" fill="#7d1b14" stroke="#3b0905" stroke-width="2"/>
+        <polygon points="50,22 76,66 24,66" fill="#9b2a20" stroke="#e8c27a" stroke-width="1.5"/>
+        <path d="M50 4 L50 22 M90 27 L76 66 M10 27 L24 66 M50 96 L76 66 M50 96 L24 66 M90 73 L76 66 M10 73 L24 66 M10 27 L50 22 M90 27 L50 22"
+              stroke="#e8c27a" stroke-width="1.2" opacity=".7"/>
+        <text x="50" y="56" text-anchor="middle" font-family="Cinzel, serif" font-size="16" font-weight="700" fill="#f3dca0">20</text>
+      </svg>
+
+      <div class="moneda m1"></div>
+      <div class="moneda m2"></div>
+      <div class="moneda m3"></div>
+    </div>
+
+    <!-- ===== El diario ===== -->
+    <div id="libro-escenario">
+      <div id="libro" aria-label="Diario de Rhazustión"></div>
+    </div>
+
+    <div id="aviso">Presioná cualquier tecla</div>
+
+    <nav id="controles" aria-label="Navegación del diario">
+      <button id="btn-ant" title="Página anterior (←)">‹</button>
+      <span id="indicador"></span>
+      <button id="btn-sig" title="Página siguiente (→)">›</button>
+      <button id="btn-cerrar" title="Cerrar el diario (Esc)">Cerrar ✕</button>
+    </nav>
+  </div>
+
+  <!-- Página invisible que se usa para medir cuánto texto entra en cada hoja -->
+  <div id="medidor" class="pagina" aria-hidden="true"><div class="contenido"></div></div>
+
+  <!-- Primero el contenido del diario, después la lógica -->
+  <script src="data/diario.js"></script>
+  <script src="js/paginador.js"></script>
+  <script src="js/libro.js"></script>
+</body>
+</html>
