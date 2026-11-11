@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/estilos.css">
+  <link rel="stylesheet" href="css/cuentas.css">
 </head>
 <body>
   <div id="escena">
@@ -60,14 +61,88 @@
       <button id="btn-sig" title="Página siguiente (→)">›</button>
       <button id="btn-cerrar" title="Cerrar el diario (Esc)">Cerrar ✕</button>
     </nav>
+
+    <!-- ===== Sesión (arriba a la derecha) ===== -->
+    <div id="sesion">
+      <span id="sesion-nombre"></span>
+      <span id="sesion-pendiente" hidden>· cambios sin guardar</span>
+      <button id="btn-editar" hidden>✎ Editar</button>
+      <button id="btn-salir">Salir</button>
+    </div>
+
+    <!-- ===== Login ===== -->
+    <div id="login">
+      <form id="login-form" class="pergamino" autocomplete="on">
+        <div class="sello">❦</div>
+        <h1>El diario está sellado</h1>
+        <p class="bajada">Solo quienes conocen la palabra pueden leerlo.</p>
+        <label>Nombre
+          <input id="login-usuario" name="username" autocomplete="username" required autofocus>
+        </label>
+        <label>Clave
+          <input id="login-clave" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <p id="login-error" role="alert"></p>
+        <button id="login-boton" type="submit">Romper el sello</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== Editor (solo para la cuenta de editor) ===== -->
+  <div id="editor" aria-label="Editor del diario">
+    <div class="ed-marco">
+      <header class="ed-cabecera">
+        <h2>✎ Editar el diario</h2>
+        <span id="ed-estado" role="status"></span>
+        <button id="ed-cerrar">Cerrar ✕</button>
+      </header>
+      <div class="ed-cuerpo">
+        <aside class="ed-lista">
+          <button class="ed-item" data-sec="personaje">Ficha del personaje</button>
+          <button class="ed-item" data-sec="cuentas">Cuentas</button>
+          <h3>Entradas</h3>
+          <ol id="ed-entradas"></ol>
+          <button id="ed-nueva">+ Nueva entrada</button>
+        </aside>
+        <section id="ed-form"></section>
+      </div>
+      <footer class="ed-pie">
+        <button id="ed-descartar">Descartar cambios</button>
+        <button id="ed-guardar" class="primario">Guardar y publicar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ===== Token de GitHub (se pide una sola vez por navegador) ===== -->
+  <div id="token" aria-label="Conectar con GitHub">
+    <form id="token-form" class="pergamino ancho">
+      <h2>Conectar con GitHub</h2>
+      <p>Para guardar, la página necesita permiso para escribir en el repositorio del diario. Se hace <strong>una sola vez</strong> en cada navegador, y el permiso queda guardado solo acá.</p>
+      <ol>
+        <li>Abrí <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> (con tu cuenta de GitHub).</li>
+        <li><em>Token name:</em> «Diario de Rhazustión». <em>Expiration:</em> la que quieras (hasta 1 año).</li>
+        <li><em>Repository access:</em> «Only select repositories» y elegí <strong id="token-repo"></strong>.</li>
+        <li><em>Permissions → Repository permissions → Contents:</em> «Read and write».</li>
+        <li>Tocá <em>Generate token</em>, copiá el código (empieza con <code>github_pat_</code>) y pegalo acá:</li>
+      </ol>
+      <input id="token-valor" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      <p id="token-error" role="alert"></p>
+      <div class="botones">
+        <button type="button" id="token-cancelar">Cancelar</button>
+        <button type="submit" class="primario">Guardar y continuar</button>
+      </div>
+    </form>
   </div>
 
   <!-- Página invisible que se usa para medir cuánto texto entra en cada hoja -->
   <div id="medidor" class="pagina" aria-hidden="true"><div class="contenido"></div></div>
 
-  <!-- Primero el contenido del diario, después la lógica -->
-  <script src="data/diario.js"></script>
+  <script src="js/config.js"></script>
+  <script src="data/diario.enc.js"></script>
+  <script src="js/cripto.js"></script>
   <script src="js/paginador.js"></script>
   <script src="js/libro.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

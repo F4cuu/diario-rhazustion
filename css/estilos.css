@@ -196,6 +196,7 @@ body.listo #libro { opacity: 1; }
 .contenido p { text-align: justify; text-indent: 1.3em; margin-bottom: .35em; }
 .contenido p.inicial, .contenido p.cont { text-indent: 0; }
 .contenido p.cortado { text-align-last: justify; }
+.contenido p.inicial + p { clear: left; }
 .contenido p.inicial::first-letter {
   float: left; font-family: "Cinzel", serif; font-weight: 700;
   font-size: 3.3em; line-height: .85; padding: 4px 6px 0 0; color: var(--tinta-roja);

@@ -1,0 +1,188 @@
+/* =====================================================================
+   ESTILOS — login, sesión, editor y conexión con GitHub
+   ===================================================================== */
+
+body:not(.con-sesion) #aviso,
+body:not(.con-sesion) #sesion { visibility: hidden; pointer-events: none; }
+body:not(.con-sesion) .escritorio { filter: brightness(.5) blur(3px); }
+
+/* ---------------- Pergamino (tarjeta base) ---------------- */
+
+.pergamino {
+  position: relative;
+  width: min(380px, calc(100vw - 32px));
+  padding: 38px 34px 30px;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(255,255,255,.4), transparent 55%),
+    radial-gradient(ellipse at 85% 95%, rgba(150,105,50,.28), transparent 55%),
+    var(--papel);
+  color: var(--tinta);
+  border-radius: 4px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.75), inset 0 0 50px rgba(120,80,30,.35), 0 0 0 1px rgba(60,35,10,.5);
+  user-select: text;
+}
+.pergamino.ancho { width: min(560px, calc(100vw - 32px)); }
+.pergamino h1, .pergamino h2 {
+  font-family: "Cinzel", serif; font-weight: 700; color: var(--tinta-roja);
+  text-align: center; font-size: 22px; letter-spacing: .04em; line-height: 1.25;
+}
+.pergamino label { display: block; margin-top: 14px; font-family: "Cinzel", serif; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--tinta-suave); }
+.pergamino input {
+  display: block; width: 100%; margin-top: 5px; padding: 9px 11px;
+  font: 17px "IM Fell English", Georgia, serif; color: var(--tinta);
+  background: rgba(255,255,255,.45); border: 1px solid rgba(93,70,49,.45); border-radius: 4px;
+  text-transform: none; letter-spacing: 0;
+}
+.pergamino input:focus { outline: 2px solid rgba(122,31,18,.45); outline-offset: 1px; background: rgba(255,255,255,.65); }
+
+button.primario, .pergamino button[type="submit"] {
+  font-family: "Cinzel", serif; font-weight: 700; font-size: 14px; letter-spacing: .1em;
+  color: var(--oro-claro); background: linear-gradient(180deg, #7a2a1c, #551a10);
+  border: 1px solid #3a0f08; border-radius: 4px; padding: 11px 18px; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,220,160,.25), 0 3px 8px rgba(0,0,0,.35);
+}
+button.primario:hover, .pergamino button[type="submit"]:hover { filter: brightness(1.12); }
+button.primario:disabled, .pergamino button[type="submit"]:disabled { filter: grayscale(.4) brightness(.85); cursor: wait; }
+
+/* ---------------- Login ---------------- */
+
+#login {
+  position: absolute; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .7s ease, visibility .7s;
+}
+#login.oculto { opacity: 0; visibility: hidden; pointer-events: none; }
+#login .pergamino { text-align: left; }
+#login .sello {
+  width: 62px; height: 62px; margin: -70px auto 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; color: #f3c9a0;
+  background: radial-gradient(circle at 35% 30%, #b2392a, #6e160d 70%);
+  box-shadow: 0 6px 14px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.18);
+}
+#login .bajada { text-align: center; font-style: italic; color: var(--tinta-suave); margin: 6px 0 6px; }
+#login button[type="submit"] { width: 100%; margin-top: 18px; }
+#login-error { min-height: 1.3em; margin-top: 10px; color: var(--tinta-roja); font-size: 15px; text-align: center; }
+.sacudir { animation: sacudir .4s; }
+@keyframes sacudir { 20%,60% { transform: translateX(-7px); } 40%,80% { transform: translateX(7px); } }
+
+/* ---------------- Barra de sesión ---------------- */
+
+#sesion {
+  position: absolute; top: 14px; right: 16px; z-index: 20;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+  padding: 6px 8px 6px 14px; border-radius: 999px;
+  background: rgba(20,12,7,.7); border: 1px solid rgba(212,172,87,.35);
+  color: var(--oro-claro); font-family: "Cinzel", serif; font-size: 13px; letter-spacing: .06em;
+  transition: opacity .5s;
+}
+#sesion-pendiente { font-family: "IM Fell English", serif; font-style: italic; color: #f0b07a; letter-spacing: 0; }
+#sesion button {
+  background: none; border: 0; color: inherit; font: inherit; cursor: pointer;
+  padding: 4px 10px; border-radius: 999px;
+}
+#sesion button:hover { background: rgba(212,172,87,.18); }
+#btn-editar { border: 1px solid rgba(212,172,87,.45) !important; }
+
+/* ---------------- Editor ---------------- */
+
+#editor, #token {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(8,5,3,.72); backdrop-filter: blur(3px);
+  opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s;
+}
+#token { z-index: 200; }
+#editor.visible, #token.visible { opacity: 1; visibility: visible; }
+
+.ed-marco {
+  width: min(1100px, 100%); height: min(760px, 100%);
+  display: flex; flex-direction: column;
+  background: var(--papel); color: var(--tinta);
+  border-radius: 6px; overflow: hidden;
+  box-shadow: 0 30px 90px rgba(0,0,0,.8), 0 0 0 8px var(--cuero), 0 0 0 9px var(--oro);
+  user-select: text;
+}
+.ed-cabecera, .ed-pie {
+  display: flex; align-items: center; gap: 12px; padding: 12px 18px;
+  background: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.09));
+}
+.ed-cabecera { border-bottom: 1px solid rgba(93,70,49,.3); }
+.ed-pie { border-top: 1px solid rgba(93,70,49,.3); justify-content: flex-end; }
+.ed-cabecera h2 { font-family: "Cinzel", serif; font-size: 18px; color: var(--tinta-roja); }
+#ed-estado { flex: 1; font-size: 15px; font-style: italic; color: var(--tinta-suave); }
+#ed-estado.ok { color: #2f6a2a; font-style: normal; }
+#ed-estado.error { color: var(--tinta-roja); font-style: normal; }
+#ed-estado.aviso { color: #9a5a17; }
+
+.ed-marco button, #token button:not([type="submit"]) {
+  font: 15px "IM Fell English", Georgia, serif; color: var(--tinta);
+  background: rgba(255,255,255,.4); border: 1px solid rgba(93,70,49,.4);
+  border-radius: 4px; padding: 6px 12px; cursor: pointer;
+}
+.ed-marco button:hover { background: rgba(255,255,255,.7); }
+.ed-marco button.primario { color: var(--oro-claro); background: linear-gradient(180deg, #7a2a1c, #551a10); border-color: #3a0f08; font-family: "Cinzel", serif; font-size: 14px; }
+.ed-marco button.peligro { color: var(--tinta-roja); border-color: rgba(122,31,18,.45); }
+.ed-marco button.peligro[data-armado] { background: var(--tinta-roja); color: #fff; }
+#ed-descartar[data-armado] { background: var(--tinta-roja); color: #fff; }
+
+.ed-cuerpo { flex: 1; display: flex; min-height: 0; }
+.ed-lista {
+  width: 250px; flex: none; overflow-y: auto; padding: 14px 10px;
+  border-right: 1px solid rgba(93,70,49,.3); background: rgba(120,80,30,.07);
+}
+.ed-lista h3 { font-family: "Cinzel", serif; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--tinta-suave); margin: 16px 6px 6px; }
+.ed-lista ol { list-style: none; }
+.ed-lista .ed-item {
+  display: block; width: 100%; text-align: left; margin-bottom: 4px;
+  background: transparent; border-color: transparent;
+}
+.ed-lista .ed-item .t { display: block; }
+.ed-lista .ed-item .f { display: block; font-size: 12.5px; color: var(--tinta-suave); font-style: italic; }
+.ed-lista .ed-item.activo { background: rgba(122,31,18,.12); border-color: rgba(122,31,18,.35); }
+#ed-nueva { width: 100%; margin-top: 6px; border-style: dashed; }
+
+#ed-form { flex: 1; overflow-y: auto; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+#ed-form h3 { font-family: "Cinzel", serif; font-size: 18px; color: var(--tinta-roja); }
+.ed-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ed-fila.tres { grid-template-columns: repeat(3, 1fr); }
+.ed-fila.seis { grid-template-columns: repeat(6, 1fr); }
+.ed-fila.cuenta { grid-template-columns: 1.3fr 1fr 1.3fr 90px; align-items: end; }
+.ed-campo { display: flex; flex-direction: column; gap: 4px; }
+.ed-campo .et { font-family: "Cinzel", serif; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-suave); }
+.ed-campo .ayuda { font-size: 13px; font-style: italic; color: var(--tinta-suave); }
+.ed-campo input, .ed-campo textarea, .ed-campo select {
+  font: 17px "IM Fell English", Georgia, serif; color: var(--tinta);
+  background: rgba(255,255,255,.5); border: 1px solid rgba(93,70,49,.4); border-radius: 4px; padding: 8px 10px;
+  width: 100%; min-width: 0;
+}
+.ed-campo textarea { resize: vertical; line-height: 1.5; }
+.ed-campo.grande { flex: 1; }
+.ed-campo.grande textarea { flex: 1; min-height: 300px; }
+.ed-campo.chica textarea { min-height: 70px; }
+.ed-campo input:focus, .ed-campo textarea:focus, .ed-campo select:focus { outline: 2px solid rgba(122,31,18,.4); background: rgba(255,255,255,.75); }
+.ed-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.ed-nota { font-style: italic; color: var(--tinta-suave); font-size: 15px; }
+.ed-cuentas { display: flex; flex-direction: column; gap: 10px; }
+.ed-yo { font-style: italic; color: var(--tinta-suave); padding: 0 0 9px; text-align: center; }
+
+/* ---------------- Token ---------------- */
+
+#token-form p, #token-form li { font-size: 16px; line-height: 1.45; margin-top: 10px; }
+#token-form ol { padding-left: 22px; }
+#token-form a { color: var(--tinta-roja); }
+#token-form code { font-size: 14px; background: rgba(0,0,0,.07); padding: 1px 4px; border-radius: 3px; }
+#token-valor { margin-top: 14px; font-family: ui-monospace, Consolas, monospace !important; font-size: 14px !important; }
+#token-error { color: var(--tinta-roja); min-height: 1.2em; }
+#token-form .botones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+
+/* ---------------- Pantallas angostas ---------------- */
+
+@media (max-width: 720px) {
+  .ed-cuerpo { flex-direction: column; }
+  .ed-lista { width: auto; max-height: 34%; border-right: 0; border-bottom: 1px solid rgba(93,70,49,.3); }
+  .ed-fila, .ed-fila.tres { grid-template-columns: 1fr; }
+  .ed-fila.seis { grid-template-columns: repeat(3, 1fr); }
+  .ed-fila.cuenta { grid-template-columns: 1fr 1fr; }
+  #sesion { top: 8px; right: 8px; font-size: 12px; }
+}

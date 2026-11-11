@@ -1,34 +1,40 @@
 # Diario de Rhazustión
 
-Una página web con un escritorio y el diario en el centro. Presionás cualquier tecla,
-el diario se acerca y se lee página por página.
+Una página web con un escritorio y el diario en el centro. Para leerlo hay que entrar
+con una cuenta. Después presionás cualquier tecla, el diario se acerca y se lee página por página.
 
-## Cómo abrirlo
-- **Rápido:** doble clic en `index.html`.
-- **Con VS Code (recomendado):** abrí la carpeta en VS Code, instalá la extensión
-  **Live Server** (VS Code te la sugiere sola) y hacé clic en **Go Live** abajo a la derecha.
-  Cada vez que guardás un archivo, la página se recarga sola.
+**Link:** https://f4cuu.github.io/diario-rhazustion/
 
-## Cómo escribir
-Todo el texto está en **`data/diario.js`**. Cada entrada es:
+## Cuentas
+| Cuenta | Permiso |
+|---|---|
+| Huevañez | Leer y editar |
+| Catta, Pingas, Balatro | Solo leer |
 
-```js
-{
-  titulo: "Sesión 3",
-  fecha: "14 de marzo",
-  texto: `
-Primer párrafo...
+Al escribir el nombre y la clave no importan las mayúsculas ni las tildes.
+Las claves se cambian desde la página: **✎ Editar → Cuentas** (solo una cuenta editora puede hacerlo).
 
-Segundo párrafo (línea en blanco = párrafo nuevo).
-*cursiva*  **negrita**
-`
-},
-```
+## Cómo está protegido
+El diario se guarda **cifrado** en `data/diario.enc.js` (AES-256). Aunque el repositorio
+sea público, sin una clave válida el contenido no se puede leer. Las claves no están
+guardadas en ningún lado.
 
-No hace falta cortar el texto en páginas: el diario lo reparte solo
-y arma el índice con los números de página.
+La protección depende de que las claves no sean fáciles de adivinar: una clave corta
+o conocida (como el nombre del personaje) se puede descubrir probando.
 
-## Controles
+## Cómo escribir (cuenta Huevañez)
+1. Entrá a la página con tu cuenta y tocá **✎ Editar** (arriba a la derecha).
+2. Elegí una entrada o tocá **+ Nueva entrada**. En el texto, una línea en blanco empieza un párrafo nuevo;
+   `*cursiva*` y `**negrita**`.
+3. **Ver en el diario** te muestra cómo queda sin publicar.
+4. **Guardar y publicar** (o `Ctrl+S`). La primera vez en cada navegador te pide un token de GitHub
+   (la página explica cómo crearlo). La página pública se actualiza en 1–2 minutos.
+
+El texto del diario **ya no se edita en VS Code**: el archivo está cifrado.
+Si cambiás el código (estilos, diseño), primero hacé **Sync / Pull** en VS Code para
+bajar lo que se guardó desde la web y no pisarlo.
+
+## Controles del diario
 | Acción | Teclado | Mouse / celular |
 |---|---|---|
 | Abrir el diario | cualquier tecla | clic / tocar |
@@ -36,11 +42,15 @@ y arma el índice con los números de página.
 | Página anterior | ← · RePág | clic en la mitad izquierda / deslizar a la derecha |
 | Ir al principio / final | Inicio / Fin | — |
 | Ir a una entrada | — | clic en el índice |
-| Cerrar el diario | Esc | botón "Cerrar" |
+| Cerrar el diario | Esc | botón «Cerrar» |
 
 ## Archivos
-- `index.html`: la estructura de la página (escritorio, vela, dado, mapa).
-- `css/estilos.css`: el aspecto (colores arriba de todo, en `:root`).
+- `index.html`: la estructura de la página.
+- `css/estilos.css`: el escritorio y el libro. `css/cuentas.css`: login y editor.
+- `js/cripto.js`: cifrado y descifrado.
 - `js/paginador.js`: reparte el texto en páginas.
-- `js/libro.js`: arma el libro 3D y maneja animaciones y controles.
-- `data/diario.js`: **tu contenido**.
+- `js/libro.js`: el libro 3D, animaciones y controles.
+- `js/editor.js`: el editor y el guardado en GitHub.
+- `js/app.js`: login y sesión.
+- `js/config.js`: usuario y repositorio de GitHub.
+- `data/diario.enc.js`: **el diario cifrado** (no se toca a mano).
