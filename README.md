@@ -1,7 +1,8 @@
 # Diario de Rhazustión
 
 Una página web con un escritorio y el diario en el centro. Para leerlo hay que entrar
-con una cuenta. Después presionás cualquier tecla, el diario se acerca y se lee página por página.
+con una cuenta. Después hacés clic en el diario, se acerca y se lee página por página.
+Sobre la mesa hay un dado de cada tipo para tirar.
 
 **Link:** https://f4cuu.github.io/diario-rhazustion/
 
@@ -37,12 +38,23 @@ bajar lo que se guardó desde la web y no pisarlo.
 ## Controles del diario
 | Acción | Teclado | Mouse / celular |
 |---|---|---|
-| Abrir el diario | cualquier tecla | clic / tocar |
+| Abrir el diario | — | clic / tocar sobre el diario |
 | Página siguiente | → · Espacio · AvPág | clic en la mitad derecha / deslizar a la izquierda |
 | Página anterior | ← · RePág | clic en la mitad izquierda / deslizar a la derecha |
 | Ir al principio / final | Inicio / Fin | — |
 | Ir a una entrada | — | clic en el índice |
 | Cerrar el diario | Esc | botón «Cerrar» |
+
+## Dados
+Sobre el escritorio hay un d4, d6, d8, d10, d% (decenas), d12, d20 y un d2 (moneda),
+en blanco nacarado con números grafito.
+
+- **Mantené apretado** un dado para levantarlo.
+- **Agitalo** (movelo de un lado a otro): gira en la mano.
+- **Soltalo** mientras lo agitás o lanzándolo con un movimiento: el dado rueda y queda con un número arriba.
+- Si lo movés despacio y lo soltás quieto, solo se apoya.
+
+Funciona con mouse y con el dedo en el celular. Los dados rebotan contra los bordes y contra el diario.
 
 ## Archivos
 - `index.html`: la estructura de la página.
@@ -53,4 +65,6 @@ bajar lo que se guardó desde la web y no pisarlo.
 - `js/editor.js`: el editor y el guardado en GitHub.
 - `js/app.js`: login y sesión.
 - `js/config.js`: usuario y repositorio de GitHub.
+- `js/dados.js`: los dados 3D y su física.
+- `vendor/three.min.js`: three.js r149 (licencia MIT, en `vendor/three-LICENSE.txt`).
 - `data/diario.enc.js`: **el diario cifrado** (no se toca a mano).

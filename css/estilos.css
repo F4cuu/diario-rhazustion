@@ -96,11 +96,7 @@ body {
 }
 @keyframes halo { 0%,100% { opacity: .85; } 50% { opacity: 1; } 70% { opacity: .75; } }
 
-/* Dado y monedas */
-.dado {
-  position: absolute; left: 14%; bottom: 14%; width: 74px; height: 74px;
-  transform: rotate(18deg); filter: drop-shadow(0 8px 8px rgba(0,0,0,.6));
-}
+/* Monedas */
 .moneda {
   position: absolute; width: 34px; height: 34px; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #ffe9a8, #c9962f 55%, #7a5512);
@@ -327,3 +323,37 @@ body.listo #libro { opacity: 1; }
   #libro, .hoja { transition-duration: .01s; }
   .vela .llama, .vela .halo, #aviso { animation: none; }
 }
+
+/* ------------------------------------------------ Dados */
+
+#dados {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; transition: opacity .8s ease, filter 1.2s ease;
+}
+#dados.listo { opacity: 1; }
+#dados canvas { display: block; width: 100%; height: 100%; }
+#escena.leyendo #dados { filter: brightness(.45) blur(2px); z-index: 1; }
+/* con el diario cerrado, los dados se ven por encima (un dado en el aire pasa por delante del libro);
+   al leer, quedan detrás del diario abierto */
+#libro-escenario { z-index: 2; }
+#escena:not(.leyendo) #dados { z-index: 3; }
+body:not(.con-sesion) #dados { filter: brightness(.5) blur(3px); }
+#escena.sobre-dado, #escena.sobre-dado * { cursor: grab !important; }
+#escena.agarrando, #escena.agarrando * { cursor: grabbing !important; }
+#escena { touch-action: none; }
+
+/* El diario: se abre con un clic sobre él */
+#libro-escenario { cursor: default; }
+#escena:not(.leyendo) .hoja { cursor: pointer; }
+#escena.leyendo #libro-escenario { cursor: pointer; }
+.huella {
+  position: absolute; top: 0; left: var(--pw); width: var(--pw); height: var(--ph);
+  pointer-events: none; visibility: hidden;
+}
+#aviso .sep, #aviso .linea2 { letter-spacing: .18em; }
+#aviso .linea2 { font-size: .8em; }
+@media (max-width: 720px) {
+  #aviso .sep { display: none; }
+  #aviso .linea2 { display: block; margin-top: 6px; }
+}
+#aviso, #controles { z-index: 10; }

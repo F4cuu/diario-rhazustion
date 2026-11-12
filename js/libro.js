@@ -140,7 +140,7 @@ const Libro = (() => {
     }
     L = hojas.length;
 
-    ["sombra", "canto canto-inf", "canto canto-der"].forEach((c) => {
+    ["sombra", "canto canto-inf", "canto canto-der", "huella"].forEach((c) => {
       const d = document.createElement("div"); d.className = c; libro.appendChild(d);
     });
 
@@ -245,7 +245,7 @@ const Libro = (() => {
   document.addEventListener("keydown", (e) => {
     if (!habilitado) return;
     if (e.ctrlKey || e.metaKey || e.altKey || ["Shift", "Control", "Alt", "Meta", "Tab"].includes(e.key)) return;
-    if (estado === "escritorio") { if (!e.repeat) abrir(); return; }
+    if (estado === "escritorio") return;   // el diario se abre con un clic sobre él
     switch (e.key) {
       case "ArrowRight": case "PageDown": case " ": siguiente(); e.preventDefault(); break;
       case "ArrowLeft":  case "PageUp":             anterior();  e.preventDefault(); break;
@@ -257,7 +257,7 @@ const Libro = (() => {
 
   document.getElementById("libro-escenario").addEventListener("click", (e) => {
     if (!habilitado) return;
-    if (estado === "escritorio") { abrir(); return; }
+    if (estado === "escritorio") { if (e.target.closest && e.target.closest(".hoja")) abrir(); return; }
     if (estado !== "leyendo") return;
     e.clientX < innerWidth / 2 ? anterior() : siguiente();
   });
@@ -276,6 +276,10 @@ const Libro = (() => {
   });
 
   addEventListener("resize", aplicarTransform);
+
+  // Aun sin sesión, el lugar del diario en la mesa ya existe (los dados lo esquivan)
+  { const h = document.createElement("div"); h.className = "huella"; libro.appendChild(h); }
+  aplicarTransform();
 
   return {
     construir,
