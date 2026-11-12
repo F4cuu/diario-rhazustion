@@ -20,6 +20,9 @@ const Libro = (() => {
   let volteadas = 0;           // cuántas hojas ya se dieron vuelta (0 = cerrado)
   let estado = "escritorio";   // escritorio | abriendo | leyendo | cerrando
   let habilitado = false;      // false mientras se muestra el login o el editor
+  // dónde está el libro 3D en pantalla (lo informa la mesa 3D); el de páginas sale y vuelve ahí
+  let destinoMesa = null;
+  let temporizadorOcultar = null;
 
   async function esperarFuentes() {
     if (!document.fonts) return;
@@ -120,6 +123,8 @@ const Libro = (() => {
   async function construir(D) {
     await esperarFuentes();
     const paginas = armarPaginas(D);
+    // el título también va en la tapa del libro 3D de la mesa
+    if (typeof Dados !== "undefined" && Dados.ponerTitulo) Dados.ponerTitulo(D.titulo);
 
     libro.innerHTML = "";
     hojas = [];
@@ -183,11 +188,18 @@ const Libro = (() => {
     const s = escala();
     const x = volteadas === 0 ? -W / 2 : volteadas === L ? W / 2 : 0;
     if (estado === "escritorio") {
-      libro.style.transform =
-        `translateY(${innerHeight * 0.05}px) scale(${s * 0.5}) rotateX(42deg) rotateZ(-14deg) translateX(${-W / 2}px)`;
+      // sobre la mesa: justo encima del libro 3D (así al abrirlo parece que se levanta ese mismo libro)
+      const d = destinoMesa && destinoMesa();
+      if (d) {
+        libro.style.transform =
+          `translate(${d.x - innerWidth / 2}px, ${d.y - innerHeight / 2}px) scale(${d.ancho / W}) rotateX(${d.inclinacion}deg) rotateZ(${d.angulo}deg) translateX(${-W / 2}px)`;
+      } else {
+        libro.style.transform =
+          `translate(0px, ${innerHeight * 0.05}px) scale(${s * 0.5}) rotateX(42deg) rotateZ(-14deg) translateX(${-W / 2}px)`;
+      }
     } else {
       libro.style.transform =
-        `translateY(${-innerHeight * 0.02}px) scale(${s}) rotateX(0deg) rotateZ(0deg) translateX(${x}px)`;
+        `translate(0px, ${-innerHeight * 0.02}px) scale(${s}) rotateX(0deg) rotateZ(0deg) translateX(${x}px)`;
     }
   }
 
@@ -202,6 +214,14 @@ const Libro = (() => {
 
   function abrir(despues) {
     if (estado !== "escritorio") return;
+    // primero, sin animación, el libro de páginas se pone exactamente donde está el 3D…
+    clearTimeout(temporizadorOcultar);
+    libro.style.transition = "none";
+    aplicarTransform();
+    void libro.offsetWidth;
+    libro.style.transition = "";
+    escena.classList.add("libro-visible");
+    // …y desde ahí se acerca y se abre
     estado = "abriendo";
     escena.classList.add("leyendo");
     aplicarTransform();
@@ -222,6 +242,8 @@ const Libro = (() => {
       estado = "escritorio";
       escena.classList.remove("leyendo");
       aplicarTransform();
+      // cuando termina de volver a la mesa, se ve de nuevo el libro 3D
+      temporizadorOcultar = setTimeout(() => escena.classList.remove("libro-visible"), 1250);
     }, 900);
   }
 
@@ -236,7 +258,8 @@ const Libro = (() => {
   function reiniciar() {
     estado = "escritorio";
     volteadas = 0;
-    escena.classList.remove("leyendo");
+    clearTimeout(temporizadorOcultar);
+    escena.classList.remove("leyendo", "libro-visible");
     actualizarHojas(true);
   }
 
@@ -257,7 +280,7 @@ const Libro = (() => {
 
   document.getElementById("libro-escenario").addEventListener("click", (e) => {
     if (!habilitado) return;
-    if (estado === "escritorio") { if (e.target.closest && e.target.closest(".hoja")) abrir(); return; }
+    if (estado === "escritorio") return;   // sobre la mesa se abre con doble clic (ver abajo)
     if (estado !== "leyendo") return;
     e.clientX < innerWidth / 2 ? anterior() : siguiente();
   });
@@ -275,6 +298,8 @@ const Libro = (() => {
     if (habilitado && estado === "leyendo" && Math.abs(dx) > 50) dx < 0 ? siguiente() : anterior();
   });
 
+
+
   addEventListener("resize", aplicarTransform);
 
   // Aun sin sesión, el lugar del diario en la mesa ya existe (los dados lo esquivan)
@@ -284,6 +309,8 @@ const Libro = (() => {
   return {
     construir,
     irAEntrada,
+    abrir: () => abrir(),
+    fijarDestinoMesa(f) { destinoMesa = f; if (estado === "escritorio") aplicarTransform(); },
     reiniciar,
     habilitar(v) { habilitado = v; },
   };

@@ -304,7 +304,8 @@ const Dados = (() => {
   camara.lookAt(0, 0, 0);
 
   // Luz ambiente tenue: la que manda es la de la vela
-  mundo.add(new T.HemisphereLight(0xffe9cc, 0x2a180c, 0.42));
+  const hemisferio = new T.HemisphereLight(0xffe9cc, 0x2a180c, 0.42);
+  mundo.add(hemisferio);
   const relleno = new T.DirectionalLight(0xbfd0ff, 0.16);
   relleno.position.set(10, 14, 12);
   mundo.add(relleno);
@@ -415,6 +416,7 @@ const Dados = (() => {
       p: new T.Vector3(), v: new T.Vector3(), alto: 0,
       inclin: new T.Vector3(), inclinVel: new T.Vector3(),
       sostenida: false, objetivo: new T.Vector3(), agarre: new T.Vector3(),
+      encendida: true, nivel: 1, humoRestante: 0,
     };
   }
 
@@ -503,6 +505,219 @@ const Dados = (() => {
   }
 
   /* =================================================================
+     5b. EL DIARIO EN 3D (sobre la mesa; al abrirlo pasa al libro de páginas)
+     ================================================================= */
+
+  // misma proporción que la tapa del libro de páginas (440 × 620)
+  const LIBRO = { ancho: 4.7, largo: 4.7 * 620 / 440, grosor: 0.82 };
+
+  function lineasTitulo(t) {
+    t = (t || "Diario de Rhazustión").trim();
+    const m = /^(diario de)\s+(.+)$/i.exec(t);
+    if (m) return [m[1], m[2]];
+    const p = t.split(/\s+/);
+    if (p.length < 2) return [t];
+    const mitad = Math.ceil(p.length / 2);
+    return [p.slice(0, mitad).join(" "), p.slice(mitad).join(" ")];
+  }
+
+  // modo: "color" (cuero y oro), "metal" (dónde brilla el oro), "relieve" (el oro va hundido)
+  function dibujarTapa(c, w, h, titulo, modo) {
+    const oro = modo === "color" ? "#e2bd6a" : modo === "metal" ? "#fff" : "#2a2a2a";
+    if (modo === "color") {
+      const g = c.createRadialGradient(w * 0.42, h * 0.32, 20, w * 0.5, h * 0.5, h * 0.75);
+      g.addColorStop(0, "#7a3022"); g.addColorStop(0.55, "#5b2217"); g.addColorStop(1, "#3a130c");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      // grano del cuero
+      for (let i = 0; i < 9000; i++) {
+        c.fillStyle = Math.random() < 0.5 ? "rgba(0,0,0,.07)" : "rgba(255,210,170,.04)";
+        c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
+      }
+      // lomo más oscuro (a la izquierda)
+      const l = c.createLinearGradient(0, 0, w * 0.1, 0);
+      l.addColorStop(0, "rgba(0,0,0,.45)"); l.addColorStop(1, "rgba(0,0,0,0)");
+      c.fillStyle = l; c.fillRect(0, 0, w * 0.1, h);
+    } else {
+      c.fillStyle = modo === "metal" ? "#000" : "#8a8a8a"; c.fillRect(0, 0, w, h);
+    }
+    c.strokeStyle = oro; c.fillStyle = oro;
+    const x0 = w * 0.115, y0 = h * 0.055, x1 = w * 0.94, y1 = h * 0.945;
+    c.lineWidth = w * 0.006; c.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    c.lineWidth = w * 0.0025; c.strokeRect(x0 + w * 0.018, y0 + w * 0.018, x1 - x0 - w * 0.036, y1 - y0 - w * 0.036);
+    // esquinas
+    const e = w * 0.05;
+    [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]].forEach(([x, y, sx, sy]) => {
+      c.lineWidth = w * 0.006;
+      c.beginPath(); c.moveTo(x + sx * w * 0.03, y + sy * (w * 0.03 + e)); c.lineTo(x + sx * w * 0.03, y + sy * w * 0.03); c.lineTo(x + sx * (w * 0.03 + e), y + sy * w * 0.03); c.stroke();
+    });
+    const cx = (x0 + x1) / 2;
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.font = `${w * 0.11}px "IM Fell English", Georgia, serif`;
+    c.fillText("❦", cx, h * 0.33);
+    const lineas = lineasTitulo(titulo);
+    c.font = `700 ${w * 0.085}px Cinzel, Georgia, serif`;
+    lineas.forEach((t, i) => c.fillText(t, cx, h * (lineas.length > 1 ? 0.44 + i * 0.075 : 0.47), w * 0.74));
+    c.lineWidth = w * 0.003;
+    c.beginPath(); c.moveTo(cx - w * 0.22, h * 0.57); c.lineTo(cx + w * 0.22, h * 0.57); c.stroke();
+    c.font = `italic ${w * 0.04}px "IM Fell English", Georgia, serif`;
+    c.fillText("Memorias de un caballero arcano", cx, h * 0.61, w * 0.74);
+  }
+
+  function crearLibro() {
+    const W = 710, H = 1000;
+    const lienzos = ["color", "metal", "relieve"].map(() => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c; });
+    const [texColor, texMetal, texRelieve] = lienzos.map((c) => new T.CanvasTexture(c));
+    texColor.encoding = T.sRGBEncoding; texColor.anisotropy = 8;
+    const pintar = (titulo) => {
+      ["color", "metal", "relieve"].forEach((modo, i) => {
+        const ctx = lienzos[i].getContext("2d"); ctx.clearRect(0, 0, W, H);
+        dibujarTapa(ctx, W, H, titulo, modo);
+      });
+      [texColor, texMetal, texRelieve].forEach((t) => { t.needsUpdate = true; });
+    };
+    pintar("Diario de Rhazustión");
+
+    const cuero = new T.MeshStandardMaterial({ color: 0x5a2117, roughness: 0.62, metalness: 0.05 });
+    const tapaMat = new T.MeshStandardMaterial({ map: texColor, metalnessMap: texMetal, metalness: 1, bumpMap: texRelieve, bumpScale: 0.035, roughness: 0.5 });
+    const texHojas = lienzoTextura(64, 256, (c, w, h) => {
+      c.fillStyle = "#e9dcbc"; c.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 2) { c.fillStyle = `rgba(150,120,80,${0.12 + Math.random() * 0.18})`; c.fillRect(0, y, w, 1); }
+    });
+    const hojasMat = new T.MeshStandardMaterial({ map: texHojas, roughness: 0.9 });
+    const papel = new T.MeshStandardMaterial({ color: 0xece0c2, roughness: 0.9 });
+
+    const { ancho, largo, grosor } = LIBRO, et = 0.075;
+    const tapaSup = new T.Mesh(new T.BoxGeometry(ancho, et, largo), [cuero, cuero, tapaMat, cuero, cuero, cuero]);
+    tapaSup.position.y = grosor - et / 2;
+    const tapaInf = new T.Mesh(new T.BoxGeometry(ancho, et, largo), cuero);
+    tapaInf.position.y = et / 2;
+    const anchoHojas = ancho - 0.3, largoHojas = largo - 0.22;
+    const hojas = new T.Mesh(new T.BoxGeometry(anchoHojas, grosor - 2 * et, largoHojas), [hojasMat, papel, papel, papel, hojasMat, hojasMat]);
+    hojas.position.set(-ancho / 2 + 0.2 + anchoHojas / 2, grosor / 2, 0);
+    const lomo = new T.Mesh(new T.CylinderGeometry(grosor / 2, grosor / 2, largo, 24, 1, false, Math.PI, Math.PI), cuero);
+    lomo.rotation.x = Math.PI / 2;
+    lomo.scale.set(0.5, 1, 1);
+    lomo.position.set(-ancho / 2 + 0.04, grosor / 2, 0);
+
+    const cuerpo = new T.Group();
+    [tapaSup, tapaInf, hojas, lomo].forEach((m) => { m.castShadow = true; m.receiveShadow = true; cuerpo.add(m); });
+    const grupo = new T.Group();
+    grupo.add(cuerpo);
+    mundo.add(grupo);
+
+    return {
+      grupo, cuerpo, mallas: [tapaSup, tapaInf, hojas, lomo], pintar,
+      p: new T.Vector3(), yaw: 0.24, v: new T.Vector3(),
+      hx: ancho / 2 + 0.08, hz: largo / 2, alto: grosor,
+      levante: 0, inclin: new T.Vector3(), inclinVel: new T.Vector3(),
+      sostenido: false, objetivo: new T.Vector3(), agarre: new T.Vector3(),
+    };
+  }
+
+  // Coordenadas de un punto en el "sistema del libro" (girado)
+  function aLocalLibro(x, z) {
+    const L = libro3d, c = Math.cos(L.yaw), s = Math.sin(L.yaw), dx = x - L.p.x, dz = z - L.p.z;
+    return [c * dx - s * dz, s * dx + c * dz];
+  }
+  function aMundoLibro(lx, lz) {
+    const L = libro3d, c = Math.cos(L.yaw), s = Math.sin(L.yaw);
+    return [L.p.x + c * lx + s * lz, L.p.z - s * lx + c * lz];
+  }
+
+  // ¿Un punto de un objeto está metido en el libro? (devuelve hacia dónde empujarlo)
+  function contactoLibro(P) {
+    const L = libro3d;
+    if (!L) return null;
+    const arriba = L.alto + L.levante;
+    if (P.y >= arriba) return null;
+    const [lx, lz] = aLocalLibro(P.x, P.z);
+    if (Math.abs(lx) >= L.hx || Math.abs(lz) >= L.hz) return null;
+    const op = [[L.hx - lx, 1, 0, "l+x"], [L.hx + lx, -1, 0, "l-x"], [L.hz - lz, 0, 1, "l+z"], [L.hz + lz, 0, -1, "l-z"]]
+      .reduce((a, b) => (b[0] < a[0] ? b : a));
+    if (arriba - P.y < op[0]) return { n: new T.Vector3(0, 1, 0), pen: arriba - P.y, clave: "l-arriba" };
+    const c = Math.cos(L.yaw), s = Math.sin(L.yaw);
+    return { n: new T.Vector3(c * op[1] + s * op[2], 0, -s * op[1] + c * op[2]), pen: op[0], clave: op[3] };
+  }
+
+  // Saca un punto de la mesa de adentro del libro (para la vela y las monedas que giran)
+  function fueraDelLibro(p, r) {
+    const L = libro3d;
+    if (!L) return;
+    const [lx, lz] = aLocalLibro(p.x, p.z), hx = L.hx + r, hz = L.hz + r;
+    if (Math.abs(lx) >= hx || Math.abs(lz) >= hz) return;
+    let nx = lx, nz = lz;
+    const op = [[hx - lx, "x", hx], [hx + lx, "x", -hx], [hz - lz, "z", hz], [hz + lz, "z", -hz]].reduce((a, b) => (b[0] < a[0] ? b : a));
+    if (op[1] === "x") nx = op[2]; else nz = op[2];
+    const [x, z] = aMundoLibro(nx, nz);
+    p.x = x; p.z = z;
+  }
+
+  // Límites para el centro del libro: que no se salga de la mesa
+  function limitarLibro(p) {
+    const L = libro3d, c = Math.abs(Math.cos(L.yaw)), s = Math.abs(Math.sin(L.yaw));
+    const ex = c * L.hx + s * L.hz, ez = s * L.hx + c * L.hz, m = 0.6;
+    p.x = Math.max(limites.x0 - m + ex, Math.min(limites.x1 + m - ex, p.x));
+    p.z = Math.max(limites.z0 - m + ez, Math.min(limites.z1 + m - ez, p.z));
+    return p;
+  }
+
+  const anteriorLibro = new T.Vector3(), qYaw = new T.Quaternion(), qInclin = new T.Quaternion();
+  function moverLibro(dt) {
+    const L = libro3d;
+    anteriorLibro.copy(L.p);
+    if (sost && sost.libro && !sost.arrastrando && performance.now() - sost.t0 > 260) agarrarLibro();
+    if (L.sostenido) L.p.lerp(limitarLibro(L.objetivo.clone()), Math.min(1, dt * 14));
+    limitarLibro(L.p);
+    const vInst = tmp.subVectors(L.p, anteriorLibro).divideScalar(Math.max(dt, 1e-3));
+    L.v.lerp(vInst, 0.5);
+    if (vInst.lengthSq() < 1e-6) L.v.multiplyScalar(0.5);
+    if (L.v.lengthSq() < 1e-4) L.v.set(0, 0, 0);
+    L.levante += ((L.sostenido ? 0.45 : 0) - L.levante) * Math.min(1, dt * 10);
+    // se inclina un poquito al llevarlo y se acomoda al soltarlo
+    const objetivoInclin = tmp2.copy(L.v).setY(0).multiplyScalar(-0.004).clampLength(0, 0.07);
+    L.inclinVel.addScaledVector(tmp3.subVectors(objetivoInclin, L.inclin), 140 * dt);
+    L.inclinVel.multiplyScalar(Math.exp(-12 * dt));
+    L.inclin.addScaledVector(L.inclinVel, dt);
+    qYaw.setFromAxisAngle(ARRIBA, L.yaw);
+    const ang = L.inclin.length();
+    if (ang > 1e-5) qInclin.setFromAxisAngle(tmp3.crossVectors(ARRIBA, L.inclin).normalize(), ang); else qInclin.identity();
+    L.grupo.quaternion.copy(qInclin).multiply(qYaw);
+    L.grupo.position.set(L.p.x, L.levante, L.p.z);
+    L.grupo.visible = !escena.classList.contains("libro-visible");
+    // despierta lo que esté cerca o encima si el libro se mueve
+    if (L.v.lengthSq() > 0.01 || L.sostenido) {
+      const R = Math.hypot(L.hx, L.hz) + 1.5;
+      cuerpos.forEach((c) => { if (Math.hypot(c.p.x - L.p.x, c.p.z - L.p.z) < R) despertar(c); });
+    }
+  }
+
+  function agarrarLibro() {
+    if (!sost || !sost.libro || sost.arrastrando) return;
+    sost.arrastrando = true;
+    libro3d.sostenido = true;
+  }
+
+  // Dónde y cómo se ve el libro en pantalla: desde ahí arranca (y ahí vuelve) el libro de páginas
+  function destinoMesa() {
+    const L = libro3d;
+    if (!L) return null;
+    L.grupo.updateMatrixWorld(true);
+    const a = aPantalla(new T.Vector3(-L.hx, LIBRO.grosor, 0).applyMatrix4(L.grupo.matrixWorld));
+    const b = aPantalla(new T.Vector3(L.hx, LIBRO.grosor, 0).applyMatrix4(L.grupo.matrixWorld));
+    const m = aPantalla(new T.Vector3(0, LIBRO.grosor, 0).applyMatrix4(L.grupo.matrixWorld));
+    return { x: m.x, y: m.y, ancho: Math.hypot(b.x - a.x, b.y - a.y), angulo: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI, inclinacion: 17 };
+  }
+
+  let ultimoToqueLibro = null;
+  function tocarLibro(e) {
+    // doble clic / doble toque: dos toques cortos y cerca
+    if (ultimoToqueLibro && e.timeStamp - ultimoToqueLibro.t < 400 && Math.hypot(e.clientX - ultimoToqueLibro.x, e.clientY - ultimoToqueLibro.y) < 30) {
+      ultimoToqueLibro = null;
+      if (typeof Libro !== "undefined" && Libro.abrir) Libro.abrir();
+    } else ultimoToqueLibro = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+  }
+
+  /* =================================================================
      6. FÍSICA
      ================================================================= */
 
@@ -511,7 +726,7 @@ const Dados = (() => {
   const ARRIBA = new T.Vector3(0, 1, 0);
   let paredes = [];                      // planos: { n, d }  (adentro: n·x >= d)
   let limites = { x0: -10, x1: 10, z0: -6, z1: 6 };
-  let obstaculo = null;                  // el diario: { x0, x1, z0, z1, alto }
+  let libro3d = null;                    // el diario sobre la mesa (una caja girada)
   const dados = [], monedas = [], cuerpos = [];
   let vela = null;
 
@@ -544,13 +759,9 @@ const Dados = (() => {
           const pl = paredes[k], pen = pl.d - pl.n.dot(P);
           if (pen > -0.004) contactos.push(nuevoContacto(d, P, pl.n, pen, k, 0));
         }
-        // el diario
-        const o = obstaculo;
-        if (o && P.x > o.x0 && P.x < o.x1 && P.z > o.z0 && P.z < o.z1 && P.y < o.alto) {
-          const op = [[P.x - o.x0, -1, 0, 0], [o.x1 - P.x, 1, 0, 0], [P.z - o.z0, 0, 0, -1], [o.z1 - P.z, 0, 0, 1], [o.alto - P.y, 0, 1, 0]]
-            .reduce((a, b) => (b[0] < a[0] ? b : a));
-          contactos.push(nuevoContacto(d, P, new T.Vector3(op[1], op[2], op[3]), op[0], "o" + op.slice(1).join(), 0));
-        }
+        // el diario: sus costados empujan y sobre su tapa se puede apoyar algo (y viaja con él)
+        const cl = contactoLibro(P);
+        if (cl) contactos.push(nuevoContacto(d, P, cl.n, cl.pen, cl.clave, Math.max(0, libro3d.v.dot(cl.n)), libro3d.v));
         // la vela (un cilindro que además se puede estar moviendo)
         if (vela) {
           const dx = P.x - vela.p.x, dz = P.z - vela.p.z, d2 = dx * dx + dz * dz;
@@ -573,7 +784,9 @@ const Dados = (() => {
         const viejo = c.jn; c.jn = Math.max(0, viejo + dj); dj = c.jn - viejo;
         if (dj) aplicar(d, tmp2.copy(c.n).multiplyScalar(dj), c.r);
         for (const t of [c.t1, c.t2]) {
-          const ut = velPunto(d, c.r, tmp).dot(t.v);
+          velPunto(d, c.r, tmp);
+          if (c.vSup) tmp.sub(c.vSup);
+          const ut = tmp.dot(t.v);
           let jt = -ut / t.k;
           const lim = ROCE * c.jn, va = t.j;
           t.j = Math.max(-lim, Math.min(lim, va + jt)); jt = t.j - va;
@@ -650,7 +863,7 @@ const Dados = (() => {
     }
   }
 
-  function nuevoContacto(d, P, n, pen, clave, vObstaculo) {
+  function nuevoContacto(d, P, n, pen, clave, vObstaculo, vSuperficie) {
     const r = P.clone().sub(d.p);
     const rn = tmp3.crossVectors(r, n);
     const kn = 1 + d.invI * rn.lengthSq();
@@ -662,7 +875,7 @@ const Dados = (() => {
     const c = d.correccion[clave];
     if (!c || pen > c.pen) d.correccion[clave] = { n, pen };
     return {
-      d, r, n, kn, jn: 0,
+      d, r, n, kn, jn: 0, vSup: vSuperficie || null,
       // rebote, o si el obstáculo viene hacia el objeto (la vela arrastrada), lo empuja
       sesgo: Math.max(vn0 < -2 ? -REBOTE * vn0 : 0, vObstaculo * 1.05),
       t1: { v: t1v, k: k(t1v), j: 0 }, t2: { v: t2v, k: k(t2v), j: 0 },
@@ -757,12 +970,9 @@ const Dados = (() => {
   function empujarFuera(p, r, esVela = false) {
     p.x = Math.max(limites.x0, Math.min(limites.x1, p.x));
     p.z = Math.max(limites.z0, Math.min(limites.z1, p.z));
-    const o = obstaculo;
-    if (o && p.x > o.x0 - r && p.x < o.x1 + r && p.z > o.z0 - r && p.z < o.z1 + r) {
-      const op = [[p.x - (o.x0 - r), "x", o.x0 - r], [(o.x1 + r) - p.x, "x", o.x1 + r], [p.z - (o.z0 - r), "z", o.z0 - r], [(o.z1 + r) - p.z, "z", o.z1 + r]]
-        .reduce((a, b) => (b[0] < a[0] ? b : a));
-      p[op[1]] = op[2];
-    }
+    fueraDelLibro(p, r);
+    p.x = Math.max(limites.x0, Math.min(limites.x1, p.x));
+    p.z = Math.max(limites.z0, Math.min(limites.z1, p.z));
     if (vela && !esVela) {
       const dx = p.x - vela.p.x, dz = p.z - vela.p.z, min = RADIO_VELA + r, d = Math.hypot(dx, dz);
       if (d < min) { const k = d > 1e-4 ? min / d : 0; p.x = vela.p.x + (d > 1e-4 ? dx * k : min); p.z = vela.p.z + dz * k; }
@@ -815,30 +1025,10 @@ const Dados = (() => {
       { n: new T.Vector3(0, 0, 1), d: limites.z0 },
       { n: new T.Vector3(0, 0, -1), d: -limites.z1 },
     ];
-    actualizarObstaculo();
+    if (libro3d) limitarLibro(libro3d.p);
     if (vela) empujarFuera(vela.p, RADIO_VELA - 0.2, true);
     cuerpos.forEach(despertar);
     necesitaDibujo = true;
-  }
-
-  // El diario cerrado ocupa lugar en la mesa: los objetos rebotan contra él
-  function actualizarObstaculo() {
-    if (escena.classList.contains("leyendo")) return;
-    const huella = document.querySelector("#libro .huella");
-    if (!huella) { obstaculo = null; return; }
-    const r = huella.getBoundingClientRect();
-    if (!r.width) { obstaculo = null; return; }
-    const ach = 0.12;   // el rectángulo de un libro girado es más grande que el libro
-    const xa = r.left + r.width * ach, xb = r.right - r.width * ach;
-    const ya = r.top + r.height * ach, yb = r.bottom - r.height * ach;
-    const a = aMesa(xa, ya), b = aMesa(xb, yb);
-    const nuevo = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), z0: Math.min(a.z, b.z), z1: Math.max(a.z, b.z), alto: 40 };   // "alto": nada queda encima del libro
-    const viejo = obstaculo;
-    obstaculo = nuevo;
-    if (!viejo || Math.abs(viejo.x0 - nuevo.x0) + Math.abs(viejo.z0 - nuevo.z0) + Math.abs(viejo.x1 - nuevo.x1) > 0.2) {
-      cuerpos.forEach(despertar);
-      if (vela && !vela.sostenida) empujarFuera(vela.p, RADIO_VELA - 0.2, true);
-    }
   }
 
   /* =================================================================
@@ -857,11 +1047,12 @@ const Dados = (() => {
   function objetoBajo(x, y) {
     ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
     rayo.setFromCamera(ndc, camara);
-    const mallas = cuerpos.map((d) => d.malla).concat(vela ? vela.tocables : []);
+    const mallas = cuerpos.map((d) => d.malla).concat(vela ? vela.tocables : [], libro3d && libro3d.grupo.visible ? libro3d.mallas : []);
     const hit = rayo.intersectObjects(mallas, true)[0];
     if (!hit) return null;
     const c = cuerpos.find((d) => d.malla === hit.object);
-    return c || "vela";
+    if (c) return c;
+    return libro3d && libro3d.mallas.includes(hit.object) ? "libro" : "vela";
   }
 
   addEventListener("pointerdown", (e) => {
@@ -871,13 +1062,21 @@ const Dados = (() => {
     e.preventDefault(); e.stopPropagation();
     tragarClic = true;
     escena.classList.add("agarrando");
+    if (d === "libro") {
+      // el diario: mantener apretado lo levanta y lo arrastra; doble clic lo abre
+      const punto = aMesa(e.clientX, e.clientY, 0);
+      libro3d.agarre.copy(libro3d.p).sub(punto).setY(0);
+      libro3d.objetivo.copy(libro3d.p);
+      sost = { libro: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: e.timeStamp, arrastrando: false };
+      return;
+    }
     if (d === "vela") {
       // la vela se arrastra por la mesa desde el punto donde la agarraste
+      // un clic corto la apaga o la enciende; si la mantenés o la movés, la arrastrás
       const punto = aMesa(e.clientX, e.clientY, 0);
       vela.agarre.copy(vela.p).sub(punto).setY(0);
       vela.objetivo.copy(vela.p);
-      vela.sostenida = true;
-      sost = { vela: true, id: e.pointerId };
+      sost = { vela: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: e.timeStamp, arrastrando: false };
       return;
     }
     if (d.giro) { d.giro = null; }
@@ -890,7 +1089,13 @@ const Dados = (() => {
 
   addEventListener("pointermove", (e) => {
     if (sost && e.pointerId === sost.id) {
+      if (sost.libro) {
+        if (!sost.arrastrando && Math.hypot(e.clientX - sost.x0, e.clientY - sost.y0) > 6) agarrarLibro();
+        aMesa(e.clientX, e.clientY, 0, libro3d.objetivo).add(libro3d.agarre);
+        return;
+      }
       if (sost.vela) {
+        if (!sost.arrastrando && Math.hypot(e.clientX - sost.x0, e.clientY - sost.y0) > 6) agarrarVela();
         aMesa(e.clientX, e.clientY, 0, vela.objetivo).add(vela.agarre);
         return;
       }
@@ -915,7 +1120,16 @@ const Dados = (() => {
 
   function soltar(e) {
     if (!sost || (e && e.pointerId !== sost.id)) return;
+    if (sost.libro) {
+      const toque = !sost.arrastrando;
+      libro3d.sostenido = false;
+      sost = null;
+      escena.classList.remove("agarrando");
+      if (toque && e) tocarLibro(e);
+      return;
+    }
     if (sost.vela) {
+      if (!sost.arrastrando) alternarVela();
       vela.sostenida = false;
       sost = null;
       escena.classList.remove("agarrando");
@@ -995,14 +1209,67 @@ const Dados = (() => {
   const anteriorVela = new T.Vector3();
   let tiempoLlama = 0;
   const luzDom = document.getElementById("luz-vela");
+  const oscuridadDom = document.getElementById("vela-apagada");
+  let ultimoBrillo = 1, ultimoNivel = 1;
+
+  function agarrarVela() {
+    if (!sost || !sost.vela || sost.arrastrando) return;
+    sost.arrastrando = true;
+    vela.sostenida = true;
+  }
+
+  // Un clic: se apaga (con un hilo de humo) o se vuelve a encender
+  function alternarVela() {
+    vela.encendida = !vela.encendida;
+    if (!vela.encendida) vela.humoRestante = 1.3;
+  }
+
+  const texHumo = (() => {
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(200,195,190,.9)"); g.addColorStop(0.5, "rgba(170,165,160,.35)"); g.addColorStop(1, "rgba(150,150,150,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return new T.CanvasTexture(c);
+  })();
+  const humo = [];
+  let proximoHumo = 0;
+
+  function actualizarHumo(dt) {
+    if (vela.humoRestante > 0) {
+      vela.humoRestante -= dt;
+      proximoHumo -= dt;
+      if (proximoHumo <= 0) {
+        proximoHumo = 0.07;
+        const sp = new T.Sprite(new T.SpriteMaterial({ map: texHumo, transparent: true, depthWrite: false, opacity: 0 }));
+        const mecha = vela.inclinable.localToWorld(new T.Vector3(0, 3.25, 0));
+        sp.position.copy(mecha);
+        sp.scale.set(0.2, 0.2, 1);
+        mundo.add(sp);
+        humo.push({ sp, edad: 0, vida: 2 + Math.random() * 0.8, fase: Math.random() * 6, deriva: (Math.random() - 0.5) * 0.5 });
+      }
+    }
+    for (let i = humo.length - 1; i >= 0; i--) {
+      const h = humo[i];
+      h.edad += dt;
+      const k = h.edad / h.vida;
+      if (k >= 1) { mundo.remove(h.sp); h.sp.material.dispose(); humo.splice(i, 1); continue; }
+      h.sp.position.y += dt * 1.1;
+      h.sp.position.x += dt * (h.deriva + Math.sin(h.edad * 3 + h.fase) * 0.35);
+      const tam = 0.2 + k * 1.6;
+      h.sp.scale.set(tam, tam, 1);
+      h.sp.material.opacity = 0.32 * Math.min(1, k * 6) * (1 - k);
+    }
+  }
 
   function moverVela(dt) {
     anteriorVela.copy(vela.p);
+    if (sost && sost.vela && !sost.arrastrando && performance.now() - sost.t0 > 260) agarrarVela();
     if (vela.sostenida) {
       const obj = empujarFuera(vela.objetivo.clone(), RADIO_VELA - 0.2, true);
       vela.p.lerp(obj, Math.min(1, dt * 16));
-      empujarFuera(vela.p, RADIO_VELA - 0.2, true);
     }
+    // dentro de la mesa y fuera del diario (si arrastran el diario contra la vela, la corre)
+    empujarFuera(vela.p, RADIO_VELA - 0.2, true);
     const vInst = tmp.subVectors(vela.p, anteriorVela).divideScalar(Math.max(dt, 1e-3));
     vela.v.lerp(vInst, 0.5);
     if (!vela.sostenida && vInst.lengthSq() < 1e-6) vela.v.multiplyScalar(0.5);
@@ -1030,22 +1297,43 @@ const Dados = (() => {
     const t = tiempoLlama, rapidez = vela.v.length();
     const viento = Math.min(0.45, rapidez * 0.025);
     const f = 1 + 0.07 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 13.1 + 1.3) + 0.04 * Math.sin(t * 23.7 + 0.4) + (Math.random() - 0.5) * 0.06 - viento * 0.6;
-    vela.luz.intensity = 1.7 * f;
+    // encendida/apagada: la llama crece o se achica de a poco
+    vela.nivel += ((vela.encendida ? 1 : 0) - vela.nivel) * Math.min(1, dt * (vela.encendida ? 3.5 : 10));
+    const nv = vela.nivel;
+    vela.luz.intensity = 1.7 * f * nv;
+    hemisferio.intensity = 0.3 + 0.12 * nv;
+    // los reflejos del ambiente también se apagan (si no, los dados blancos seguirían brillando)
+    if (Math.abs(nv - ultimoNivel) > 0.01) {
+      ultimoNivel = nv;
+      mundo.traverse((o) => {
+        if (!o.isMesh) return;
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if ("envMapIntensity" in m) m.envMapIntensity = 0.3 + 0.7 * nv; });
+      });
+    }
+    vela.llama.visible = vela.halo.visible = nv > 0.02;
+    actualizarHumo(dt);
     vela.luz.position.x = (Math.random() - 0.5) * 0.03 - vela.inclin.x * 2;
     vela.luz.position.z = (Math.random() - 0.5) * 0.03 - vela.inclin.z * 2;
-    vela.llama.scale.set(0.3 * (1 + viento * 0.4), 0.8 * f * (1 - viento * 0.25), 1);
+    vela.llama.scale.set(0.3 * (1 + viento * 0.4) * (0.4 + 0.6 * nv), 0.8 * f * (1 - viento * 0.25) * nv, 1);
     // la llama se dobla para el lado contrario al movimiento (en pantalla)
     const lado = -vela.v.x * 0.03 + vela.inclin.x * 3;
     vela.llama.material.rotation += ((Math.max(-1, Math.min(1, lado)) + Math.sin(t * 5.1) * 0.04) - vela.llama.material.rotation) * Math.min(1, dt * 12);
-    vela.halo.material.opacity = 0.42 * f;
-    vela.cera.emissiveIntensity = 0.05 + 0.03 * f;
+    vela.halo.material.opacity = 0.42 * f * nv;
+    vela.cera.emissiveIntensity = (0.05 + 0.03 * f) * nv;
+    if (oscuridadDom) oscuridadDom.style.opacity = (1 - nv).toFixed(3);
+    // el diario (que es HTML, no 3D) también se oscurece al apagarla y se aclara cerca de la llama
+    if (libro3d) {
+      const dist = Math.hypot(libro3d.p.x - vela.p.x, libro3d.p.z - vela.p.z);
+      const brillo = (0.5 + 0.5 * nv) * (1.06 - Math.min(0.24, dist * 0.016) * nv);
+      if (Math.abs(brillo - ultimoBrillo) > 0.01) { ultimoBrillo = brillo; escena.style.setProperty("--brillo-libro", brillo.toFixed(3)); }
+    }
 
     // resplandor sobre la madera (el escritorio es una imagen 2D: lo iluminamos con CSS)
     if (luzDom) {
       const s = aPantalla(tmp.set(vela.p.x, 0.2, vela.p.z));
       luzDom.style.setProperty("--lx", s.x.toFixed(1) + "px");
       luzDom.style.setProperty("--ly", s.y.toFixed(1) + "px");
-      luzDom.style.opacity = (0.82 + 0.18 * f).toFixed(3);
+      luzDom.style.opacity = ((0.82 + 0.18 * f) * nv).toFixed(3);
     }
   }
 
@@ -1057,8 +1345,7 @@ const Dados = (() => {
     const lugares = [[vela.p.x, vela.p.z, 2.2]];
     const libre = (x, z, r) => {
       if (lugares.some(([a, b, ra]) => Math.hypot(a - x, b - z) < ra + r)) return false;
-      const o = obstaculo;
-      if (o && x > o.x0 - 1.4 && x < o.x1 + 1.4 && z > o.z0 - 1.4 && z < o.z1 + 1.4) return false;
+      if (libro3d) { const [lx, lz] = aLocalLibro(x, z); if (Math.abs(lx) < libro3d.hx + r + 0.3 && Math.abs(lz) < libro3d.hz + r + 0.3) return false; }
       return true;
     };
     const buscar = (r, cerca) => {
@@ -1101,7 +1388,8 @@ const Dados = (() => {
     cuadro++;
     if (escena.classList.contains("leyendo") && cuadro % 3) return;
 
-    if (sost && !sost.vela) moverSostenido(dt);
+    if (sost && sost.dado) moverSostenido(dt);
+    moverLibro(dt);
     moverVela(dt);
     const activos = sost || cuerpos.some((d) => !d.dormido);
     if (activos) {
@@ -1115,33 +1403,43 @@ const Dados = (() => {
 
   async function iniciar() {
     if (document.fonts) {
-      await Promise.race([document.fonts.load(`800 64px "Nunito"`), new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
+      await Promise.race([
+        Promise.all([document.fonts.load(`800 64px "Nunito"`), document.fonts.load(`700 64px "Cinzel"`), document.fonts.load(`italic 32px "IM Fell English"`)]),
+        new Promise((r) => setTimeout(r, 2500)),
+      ]).catch(() => {});
     }
     ORDEN.forEach((tipo) => { const d = crearDado(tipo); dados.push(d); cuerpos.push(d); mundo.add(d.malla); });
     for (let i = 0; i < 3; i++) { const m = crearMoneda(); monedas.push(m); cuerpos.push(m); mundo.add(m.malla); }
     vela = crearVela();
+    libro3d = crearLibro();
     ajustarTamano();
+    // el diario, en el centro de la mesa
+    aMesa(innerWidth * 0.5, innerHeight * 0.53, 0, libro3d.p);
+    limitarLibro(libro3d.p);
+    moverLibro(0.016);
+    if (typeof Libro !== "undefined" && Libro.fijarDestinoMesa) Libro.fijarDestinoMesa(destinoMesa);
     // la vela arranca arriba a la izquierda, como antes
     aMesa(innerWidth * 0.11, innerHeight * 0.24, 0, vela.p);
     empujarFuera(vela.p, RADIO_VELA - 0.2, true);
     ubicarIniciales();
     addEventListener("resize", ajustarTamano);
-    // el diario cambia de lugar al entrar/salir/cerrar: revisamos su huella de vez en cuando
-    setInterval(actualizarObstaculo, 600);
     requestAnimationFrame(bucle);
     contenedor.classList.add("listo");
     luzDom?.classList.add("listo");
   }
 
-  iniciar();
+  let tituloPendiente = null;
+  iniciar().then(() => { if (tituloPendiente) libro3d.pintar(tituloPendiente); });
 
   const ocupados = () => cuerpos.some((d) => !d.dormido);
   return {
     resultados: () => dados.map((d) => ({ tipo: d.tipo, valor: d.dormido ? resultado(d) : null })),
+    // el título de la tapa del libro 3D (cambia si lo editan)
+    ponerTitulo(t) { if (libro3d) libro3d.pintar(t); else tituloPendiente = t; },
     // para pruebas
-    _interno: { dados, monedas, cuerpos, get vela() { return vela; }, aMesa, aPantalla, camara, render, moverVela,
+    _interno: { dados, monedas, cuerpos, get vela() { return vela; }, aMesa, aPantalla, camara, render, moverVela, alternarVela,
       // avanza la física sin dibujar (para pruebas): devuelve los segundos simulados hasta que todo se detiene
       simular(max = 15) { const h = 1 / 60 / SUBPASOS; let t = 0; while (t < max && ocupados()) { for (let i = 0; i < SUBPASOS; i++) paso(h); t += 1 / 60; } necesitaDibujo = true; return t; },
-      get obstaculo() { return obstaculo; }, get limites() { return limites; } },
+      get libro() { return libro3d; }, destinoMesa, get limites() { return limites; } },
   };
 })();

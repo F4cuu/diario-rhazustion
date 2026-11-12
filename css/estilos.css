@@ -325,3 +325,20 @@ body:not(.con-sesion) #dados { filter: brightness(.5) blur(3px); }
 #luz-vela.listo { opacity: .9; }
 #escena.leyendo #luz-vela { filter: brightness(.45) blur(2px); }
 body:not(.con-sesion) #luz-vela { filter: brightness(.5) blur(3px); }
+
+/* El diario en la mano: sigue al puntero sin demora; al soltarlo, cae rápido */
+#libro.arrastrando { transition: transform .06s linear; }
+#libro.soltando { transition: transform .3s cubic-bezier(.3,.7,.4,1); }
+#escena:not(.leyendo) .hoja { cursor: grab; }
+
+/* Oscuridad cuando la vela está apagada */
+#vela-apagada {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, rgba(6, 4, 3, .42), rgba(3, 2, 1, .72));
+  opacity: 0;
+}
+#escena.leyendo #vela-apagada { filter: brightness(.6); }
+#escena:not(.leyendo) #libro-escenario { filter: brightness(var(--brillo-libro, 1)); transition: filter .25s; }
+
+/* Sobre la mesa se ve el libro 3D; el de páginas aparece solo al abrirlo (y hasta que vuelve a la mesa) */
+#escena:not(.libro-visible) #libro { visibility: hidden; }
