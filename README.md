@@ -2,7 +2,7 @@
 
 Una página web con un escritorio y el diario en el centro. Para leerlo hay que entrar
 con una cuenta. Después hacés clic en el diario, se acerca y se lee página por página.
-Sobre la mesa hay un dado de cada tipo para tirar.
+Sobre la mesa hay un dado de cada tipo, monedas para revolear y una vela que se puede mover.
 
 **Link:** https://f4cuu.github.io/diario-rhazustion/
 
@@ -56,6 +56,12 @@ en blanco nacarado con números grafito.
 
 Funciona con mouse y con el dedo en el celular. Los dados rebotan contra los bordes y contra el diario.
 
+## Vela y monedas
+- **La vela** se arrastra por la mesa: la luz y las sombras de todo cambian con ella, la llama se
+  dobla con el movimiento y la vela se balancea al soltarla. Los dados y las monedas chocan contra ella.
+- **Las monedas** se agarran y se revolean igual que los dados. Si caen de canto, giran sobre sí mismas
+  como un trompo; si no, rebotan y terminan girando y tambaleándose sobre la mesa hasta quedar planas.
+
 ## Archivos
 - `index.html`: la estructura de la página.
 - `css/estilos.css`: el escritorio y el libro. `css/cuentas.css`: login y editor.
@@ -65,6 +71,6 @@ Funciona con mouse y con el dedo en el celular. Los dados rebotan contra los bor
 - `js/editor.js`: el editor y el guardado en GitHub.
 - `js/app.js`: login y sesión.
 - `js/config.js`: usuario y repositorio de GitHub.
-- `js/dados.js`: los dados 3D y su física.
+- `js/dados.js`: la mesa en 3D (dados, monedas y vela) y su física.
 - `vendor/three.min.js`: three.js r149 (licencia MIT, en `vendor/three-LICENSE.txt`).
 - `data/diario.enc.js`: **el diario cifrado** (no se toca a mano).
