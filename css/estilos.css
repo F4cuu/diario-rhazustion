@@ -342,3 +342,68 @@ body:not(.con-sesion) #luz-vela { filter: brightness(.5) blur(3px); }
 
 /* Sobre la mesa se ve el libro 3D; el de páginas aparece solo al abrirlo (y hasta que vuelve a la mesa) */
 #escena:not(.libro-visible) #libro { visibility: hidden; }
+
+/* ------------------------------------------------ Registro del DM (azul) */
+/* Mismo diseño que el diario, en cuero azul y con tinta azul en los títulos */
+#libro.azul {
+  --cuero: #1f3a63;
+  --cuero-oscuro: #0b1830;
+  --tinta-roja: #1d3f72;
+}
+#libro.azul .cara.guarda {
+  background:
+    repeating-radial-gradient(circle at 0 0, transparent 0 18px, rgba(31,58,99,.08) 18px 20px),
+    repeating-radial-gradient(circle at 100% 100%, transparent 0 18px, rgba(31,58,99,.08) 18px 20px),
+    var(--papel-oscuro);
+}
+#libro.azul .tapa h1 { text-shadow: 0 1px 0 #06101f, 0 -1px 0 rgba(255,230,170,.25), 0 0 18px rgba(212,172,87,.25); }
+
+/* ------------------------------------------------ Diario de Rhazustión: tapa gastada por fuera */
+#libro:not(.azul) .cara.tapa, #libro:not(.azul) .cara.contratapa {
+  background:
+    /* manchas y un aro de taza */
+    radial-gradient(ellipse 22% 16% at 70% 78%, transparent 82%, rgba(25,8,2,.28) 86%, transparent 92%),
+    radial-gradient(ellipse 14% 10% at 32% 70%, rgba(25,8,2,.22), transparent 70%),
+    radial-gradient(ellipse 10% 14% at 80% 30%, rgba(25,8,2,.18), transparent 70%),
+    /* cuero rozado por el uso (más claro) */
+    radial-gradient(ellipse 30% 20% at 60% 55%, rgba(214,150,112,.12), transparent 70%),
+    radial-gradient(ellipse 18% 12% at 25% 20%, rgba(214,150,112,.1), transparent 70%),
+    /* rayones */
+    linear-gradient(118deg, transparent 48%, rgba(230,170,130,.3) 49%, transparent 51%) 22% 30% / 130px 70px no-repeat,
+    linear-gradient(162deg, transparent 48%, rgba(230,170,130,.25) 49%, transparent 51%) 78% 62% / 90px 40px no-repeat,
+    linear-gradient(74deg, transparent 48%, rgba(230,170,130,.22) 49.5%, transparent 51%) 40% 88% / 60px 110px no-repeat,
+    linear-gradient(20deg, transparent 48%, rgba(230,170,130,.2) 49%, transparent 51%) 85% 12% / 110px 34px no-repeat,
+    linear-gradient(135deg, transparent 48%, rgba(230,170,130,.18) 49%, transparent 51%) 12% 72% / 50px 50px no-repeat,
+    radial-gradient(ellipse at 30% 25%, rgba(255,200,150,.12), transparent 55%),
+    radial-gradient(ellipse at 75% 85%, rgba(0,0,0,.38), transparent 60%),
+    repeating-radial-gradient(circle at 40% 60%, rgba(0,0,0,.06) 0 1px, transparent 1px 3px),
+    var(--cuero);
+}
+/* bordes y esquinas rozados */
+#libro:not(.azul) .cara.tapa {
+  box-shadow:
+    inset 14px 0 18px -8px rgba(0,0,0,.6),
+    inset 0 0 0 2px var(--cuero-oscuro),
+    inset -10px 0 14px -6px rgba(214,150,112,.28),
+    inset 0 10px 14px -8px rgba(214,150,112,.22),
+    inset 0 -10px 14px -8px rgba(214,150,112,.22);
+}
+#libro:not(.azul) .cara.contratapa {
+  box-shadow:
+    inset -14px 0 18px -8px rgba(0,0,0,.6),
+    inset 0 0 0 2px var(--cuero-oscuro),
+    inset 10px 0 14px -6px rgba(214,150,112,.28),
+    inset 0 10px 14px -8px rgba(214,150,112,.22),
+    inset 0 -10px 14px -8px rgba(214,150,112,.22);
+}
+/* el dorado, gastado y saltado */
+#libro:not(.azul) .tapa .marco,
+#libro:not(.azul) .esquina { opacity: .78; }
+#libro:not(.azul) .tapa h1, #libro:not(.azul) .tapa .emblema, #libro:not(.azul) .tapa .sub, #libro:not(.azul) .contratapa .emblema {
+  -webkit-mask-image: radial-gradient(circle at 30% 40%, #000 0 60%, rgba(0,0,0,.55) 100%),
+    repeating-radial-gradient(circle at 17% 23%, #000 0 2px, rgba(0,0,0,.35) 2px 3px, #000 3px 7px);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+  mask-image: radial-gradient(circle at 30% 40%, #000 0 60%, rgba(0,0,0,.55) 100%),
+    repeating-radial-gradient(circle at 17% 23%, #000 0 2px, rgba(0,0,0,.35) 2px 3px, #000 3px 7px);
+}
+#libro:not(.azul) .tapa h1 { color: #e6cf98; }

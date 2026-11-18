@@ -23,6 +23,11 @@ const App = (() => {
     document.body.classList.add("con-sesion");
 
     await Libro.construir(diario);
+    // el Registro del DM está cifrado con la misma clave que el diario
+    if (window.REGISTRO_CIFRADO) {
+      try { await Libro.construir(await Cripto.abrirConMaestra(window.REGISTRO_CIFRADO, raw), "registro"); }
+      catch (err) { console.error("No se pudo abrir el Registro del DM", err); }
+    }
     document.body.classList.add("listo");
     $("#login").classList.add("oculto");
     Libro.habilitar(true);

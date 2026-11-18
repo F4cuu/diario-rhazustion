@@ -2,7 +2,10 @@
    EL LIBRO
    Arma las páginas, las agrupa en hojas que se dan vuelta en 3D,
    y maneja la escena: escritorio  ->  diario de cerca  ->  escritorio.
-   Uso: Libro.construir(diario)  ·  Libro.habilitar(true/false)  ·  Libro.irAEntrada(i)
+   Hay dos libros que comparten este mismo libro de páginas: el diario de Rhazustión
+   y el Registro del DM (azul). Cada uno se arma una vez y se "monta" al abrirlo.
+   Uso: Libro.construir(diario)  ·  Libro.construir(registro, "registro")
+        Libro.abrir("diario" | "registro")  ·  Libro.habilitar(true/false)  ·  Libro.irAEntrada(i)
    ===================================================================== */
 
 const Libro = (() => {
@@ -17,6 +20,8 @@ const Libro = (() => {
   const indicador = document.getElementById("indicador");
 
   let hojas = [], L = 0, inicioDe = [];
+  const libros = {};           // clave ("diario" | "registro") -> { hojas, extras, inicioDe }
+  let activo = "diario";       // el libro que está montado en #libro
   let volteadas = 0;           // cuántas hojas ya se dieron vuelta (0 = cerrado)
   let estado = "escritorio";   // escritorio | abriendo | leyendo | cerrando
   let habilitado = false;      // false mientras se muestra el login o el editor
@@ -46,7 +51,8 @@ const Libro = (() => {
 
   /* ---------------- 1. Páginas ---------------- */
 
-  function armarPaginas(D) {
+  function armarPaginas(D, clave) {
+    const esRegistro = clave === "registro";
     const entradas = D.entradas.map((e) => P.paginar([
       { crear: el("div", "encabezado",
           `<h2>${P.escapar(e.titulo || "Sin título")}</h2>` +
@@ -68,9 +74,34 @@ const Libro = (() => {
 
     let indice = armarIndice(D.entradas.map(() => "000"));
     inicioDe = [];
-    let cursor = 4 + indice.length;   // 1 tapa · 2 guarda · 3 ficha · índice · entradas
+    // diario: 1 tapa · 2 guarda · 3 ficha · índice · entradas   |   registro: 1 tapa · 2 guarda · índice · entradas
+    let cursor = (esRegistro ? 3 : 4) + indice.length;
     entradas.forEach((pags) => { inicioDe.push(cursor); cursor += pags.length; });
     indice = armarIndice(inicioDe);
+
+    if (esRegistro) {
+      const paginas = [
+        { tipo: "tapa", html: `
+            <div class="marco">
+              <div class="esquina e1"></div><div class="esquina e2"></div><div class="esquina e3"></div><div class="esquina e4"></div>
+              <div class="emblema">❦</div>
+              <h1>${P.escapar(D.titulo || "Registro del DM")}</h1>
+              <div class="linea"></div>
+              <div class="sub">${P.escapar(D.subtitulo || "Crónica de La Torre")}</div>
+            </div>` },
+        { tipo: "guarda", html: `
+            <div class="dedicatoria">
+              <p>Registro de campaña llevado por</p>
+              <p class="firma">el Director de Juego</p>
+              <p>Lo que pasó, tal como pasó.</p>
+            </div>` },
+        ...indice.map((h) => ({ tipo: "papel", html: h, numero: true })),
+        ...entradas.flat().map((h) => ({ tipo: "papel", html: h, numero: true })),
+      ];
+      if (paginas.length % 2 === 0) paginas.push({ tipo: "papel", html: "", numero: false });
+      paginas.push({ tipo: "contratapa", html: `<div class="emblema">❦</div>` });
+      return paginas;
+    }
 
     const mod = (v) => { const m = Math.floor((v - 10) / 2); return (m >= 0 ? "+" : "−") + Math.abs(m); };
     const pj = D.personaje;
@@ -120,14 +151,13 @@ const Libro = (() => {
 
   /* ---------------- 2. Hojas 3D ---------------- */
 
-  async function construir(D) {
+  async function construir(D, clave = "diario") {
     await esperarFuentes();
-    const paginas = armarPaginas(D);
+    const paginas = armarPaginas(D, clave);
     // el título también va en la tapa del libro 3D de la mesa
-    if (typeof Dados !== "undefined" && Dados.ponerTitulo) Dados.ponerTitulo(D.titulo);
+    if (clave === "diario" && typeof Dados !== "undefined" && Dados.ponerTitulo) Dados.ponerTitulo(D.titulo);
 
-    libro.innerHTML = "";
-    hojas = [];
+    const nuevas = [];
     for (let i = 0; i < paginas.length; i += 2) {
       const hoja = document.createElement("div");
       hoja.className = "hoja";
@@ -140,21 +170,37 @@ const Libro = (() => {
           : pag.html;
         hoja.appendChild(cara);
       });
-      libro.appendChild(hoja);
-      hojas.push(hoja);
+      nuevas.push(hoja);
     }
-    L = hojas.length;
-
-    ["sombra", "canto canto-inf", "canto canto-der", "huella"].forEach((c) => {
-      const d = document.createElement("div"); d.className = c; libro.appendChild(d);
+    const extras = ["sombra", "canto canto-inf", "canto canto-der", "huella"].map((c) => {
+      const d = document.createElement("div"); d.className = c; return d;
+    });
+    const inicios = inicioDe;
+    nuevas.flatMap((h) => [...h.querySelectorAll(".item-indice")]).forEach((a, i) => {
+      a.addEventListener("click", (ev) => { ev.stopPropagation(); irAPagina(inicios[i]); });
     });
 
-    libro.querySelectorAll(".item-indice").forEach((a, i) => {
-      a.addEventListener("click", (ev) => { ev.stopPropagation(); irAPagina(inicioDe[i]); });
-    });
+    libros[clave] = { hojas: nuevas, extras, inicioDe: inicios };
+    if (clave === activo) montar(clave);
+  }
 
+  // Pone un libro (ya armado) dentro de #libro
+  function montar(clave) {
+    const b = libros[clave];
+    if (!b) return false;
+    const cambia = clave !== activo || hojas !== b.hojas;
+    activo = clave;
+    if (cambia) {
+      libro.innerHTML = "";
+      b.hojas.forEach((h) => libro.appendChild(h));
+      b.extras.forEach((d) => libro.appendChild(d));
+    }
+    hojas = b.hojas; L = hojas.length; inicioDe = b.inicioDe;
+    libro.classList.toggle("azul", clave === "registro");
+    libro.setAttribute("aria-label", clave === "registro" ? "Registro del DM" : "Diario de Rhazustión");
     volteadas = Math.min(volteadas, L);
     actualizarHojas(true);
+    return true;
   }
 
   /* ---------------- 3. Estado y movimiento ---------------- */
@@ -189,7 +235,7 @@ const Libro = (() => {
     const x = volteadas === 0 ? -W / 2 : volteadas === L ? W / 2 : 0;
     if (estado === "escritorio") {
       // sobre la mesa: justo encima del libro 3D (así al abrirlo parece que se levanta ese mismo libro)
-      const d = destinoMesa && destinoMesa();
+      const d = destinoMesa && destinoMesa(activo);
       if (d) {
         libro.style.transform =
           `translate(${d.x - innerWidth / 2}px, ${d.y - innerHeight / 2}px) scale(${d.ancho / W}) rotateX(${d.inclinacion}deg) rotateZ(${d.angulo}deg) translateX(${-W / 2}px)`;
@@ -212,8 +258,10 @@ const Libro = (() => {
     actualizarHojas();
   }
 
-  function abrir(despues) {
+  function abrir(clave, despues) {
     if (estado !== "escritorio") return;
+    if (clave && clave !== activo) { volteadas = 0; if (!montar(clave)) return; }
+    if (!libros[activo]) return;
     // primero, sin animación, el libro de páginas se pone exactamente donde está el 3D…
     clearTimeout(temporizadorOcultar);
     libro.style.transition = "none";
@@ -249,9 +297,12 @@ const Libro = (() => {
 
   // Abre el diario (si hace falta) y va a la primera página de una entrada
   function irAEntrada(i) {
-    if (inicioDe[i] == null) return;
-    if (estado === "leyendo") irAPagina(inicioDe[i]);
-    else if (estado === "escritorio") abrir(() => irAPagina(inicioDe[i]));
+    const d = libros.diario;
+    if (!d || d.inicioDe[i] == null) return;
+    if (activo !== "diario" && estado !== "escritorio") return;
+    if (activo !== "diario") { volteadas = 0; montar("diario"); }
+    if (estado === "leyendo" && activo === "diario") irAPagina(inicioDe[i]);
+    else if (estado === "escritorio") abrir("diario", () => irAPagina(inicioDe[i]));
   }
 
   // Vuelve al escritorio de inmediato (al salir de la cuenta)
@@ -261,6 +312,10 @@ const Libro = (() => {
     clearTimeout(temporizadorOcultar);
     escena.classList.remove("leyendo", "libro-visible");
     actualizarHojas(true);
+    // al salir de la cuenta se olvidan los dos libros (se vuelven a armar al entrar)
+    Object.keys(libros).forEach((k) => delete libros[k]);
+    activo = "diario";
+    libro.classList.remove("azul");
   }
 
   /* ---------------- 4. Controles ---------------- */
@@ -309,7 +364,9 @@ const Libro = (() => {
   return {
     construir,
     irAEntrada,
-    abrir: () => abrir(),
+    abrir: (clave) => abrir(clave),
+    get activo() { return activo; },
+    tiene: (clave) => !!libros[clave],
     fijarDestinoMesa(f) { destinoMesa = f; if (estado === "escritorio") aplicarTransform(); },
     reiniciar,
     habilitar(v) { habilitado = v; },
