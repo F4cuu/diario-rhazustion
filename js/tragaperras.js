@@ -1,6 +1,7 @@
 /* =====================================================================
    TRAGAPERRAS DEL FUERTE + LIBRETA DE RECOMPENSAS
-   Se abre desde la máquina (o la libreta) que hay sobre el escritorio.
+   La máquina es un mueble 3D de la mesa (js/dados.js). Un clic la enfoca y
+   aparecen estos controles: volver, resultado y la libreta.
    Cada cuenta tiene su propia libreta, guardada en este navegador.
    Los datos (personajes, premios, probabilidades) están en tragaperras-datos.js
    ===================================================================== */
@@ -131,193 +132,85 @@ const Tragaperras = (() => {
     return { texto, efectos };
   }
 
-  /* ---------------- Interfaz ---------------- */
 
-  // Cada rodillo es un cilindro 3D de CARAS fichas
-  const CARAS = 10, PASO = 360 / CARAS;
-  const RODILLO = (i) => `
-    <div class="tp-rodillo" data-i="${i}">
-      <div class="tp-ventana"><div class="tp-cilindro">${'<div class="tp-cara"><img alt=""></div>'.repeat(CARAS)}</div></div>
-      <span class="tp-nombre"></span>
-    </div>`;
+  /* ---------------- Controles de la vista de frente ---------------- */
 
-  const raiz = crear("div"); raiz.id = "tp"; raiz.setAttribute("aria-hidden", "true");
+  const maq = () => (typeof Dados !== "undefined" && Dados.maquina) || null;
+
+  const raiz = crear("div"); raiz.id = "tp-hud"; raiz.setAttribute("aria-hidden", "true");
   raiz.innerHTML = `
-    <div class="tp-marco" role="dialog" aria-label="Tragaperras del Fuerte">
-      <button class="tp-cerrar" type="button" title="Volver al escritorio (Esc)">Cerrar ✕</button>
+    <button class="tp-volver" type="button" title="Volver al escritorio (Esc)">← Volver al escritorio</button>
 
-      <div class="tp-escena3d">
-      <div class="tp-gabinete">
-      <div class="tp-lado tp-lado-izq" aria-hidden="true"></div>
-      <div class="tp-lado tp-lado-der" aria-hidden="true"></div>
-      <div class="tp-lado tp-techo" aria-hidden="true"></div>
-      <div class="tp-lado tp-fondo" aria-hidden="true"></div>
-      <button class="tp-palanca3d" type="button" title="Tirar de la palanca" aria-label="Tirar de la palanca">
-        <span class="tp-pal-base"></span><span class="tp-pal-vara"><span class="tp-pal-bola"></span></span>
-      </button>
-      <section class="tp-maquina">
-        <div class="tp-cartel">
-          <h2>Tragaperras del Fuerte</h2>
-          <p>2 filas · tres iguales en una fila = premio</p>
+    <div class="tp-panel" role="region" aria-label="Tragaperras del Fuerte">
+      <div class="tp-resultado" role="status">Tirá de la palanca para probar suerte.</div>
+      <div class="tp-fila-inf">
+        <span class="tp-contador"></span>
+        <button class="tp-girar" type="button" title="Girar (Espacio)">🎰 Girar</button>
+      </div>
+      <div class="tp-buffs"></div>
+    </div>
+
+    <button class="tp-abrir-libreta" type="button" aria-expanded="false">📒 Libreta <b class="lb-nuevas" hidden></b></button>
+
+    <aside class="tp-libreta" aria-label="Libreta del Fuerte">
+      <div class="lb-hoja">
+        <div class="lb-espiral" aria-hidden="true"></div>
+        <button class="lb-cerrar" type="button" title="Cerrar la libreta">✕</button>
+        <h3>Libreta del Fuerte</h3>
+        <div class="lb-cuenta"></div>
+        <div class="lb-pestanas" role="tablist">
+          <button type="button" data-tab="inventario" class="activa">Inventario</button>
+          <button type="button" data-tab="registro">Recompensas</button>
+          <button type="button" data-tab="notas">Notas</button>
+          <button type="button" data-tab="premios">Premios</button>
         </div>
-        <div class="tp-rodillos">
-          <div class="tp-fila-et">— Fila 1 —</div>
-          ${[0, 1, 2].map((i) => RODILLO(i)).join("")}
-          <div class="tp-fila-et">— Fila 2 —</div>
-          ${[3, 4, 5].map((i) => RODILLO(i)).join("")}
+
+        <div class="lb-panel" data-panel="inventario">
+          <ul class="lb-inv"></ul>
+          <p class="lb-vacio lb-inv-vacio">Todavía no hay nada guardado. Los premios se anotan solos.</p>
+          <button type="button" class="lb-agregar">+ Agregar objeto</button>
         </div>
-        <button class="tp-girar" type="button">🎰 Girar</button>
-        <div class="tp-contador"></div>
-        <div class="tp-resultado" role="status">Tirá de la palanca y probá suerte.</div>
-        <div class="tp-buffs"></div>
-        <details class="tp-premios">
-          <summary>📖 Tabla de premios</summary>
+        <div class="lb-panel" data-panel="registro" hidden>
+          <div class="lb-reg"></div>
+          <p class="lb-vacio lb-reg-vacio">Ninguna recompensa todavía.</p>
+        </div>
+        <div class="lb-panel" data-panel="notas" hidden>
+          <textarea class="lb-notas" placeholder="Anotaciones sueltas…" spellcheck="true"></textarea>
+        </div>
+        <div class="lb-panel" data-panel="premios" hidden>
           <div class="tp-premios-lista"></div>
-        </details>
-        <button class="tp-reiniciar" type="button" title="Pone en cero tiradas y buffs. La libreta no se toca.">↺ Reiniciar máquina</button>
-      </section>
-      </div>
-      </div>
-
-      <section class="tp-libreta">
-        <div class="lb-hoja">
-          <div class="lb-espiral" aria-hidden="true"></div>
-          <h3>Libreta del Fuerte</h3>
-          <div class="lb-cuenta"></div>
-          <div class="lb-pestanas" role="tablist">
-            <button type="button" data-tab="inventario" class="activa">Inventario</button>
-            <button type="button" data-tab="registro">Recompensas <b class="lb-nuevas" hidden></b></button>
-            <button type="button" data-tab="notas">Notas</button>
-          </div>
-
-          <div class="lb-panel" data-panel="inventario">
-            <ul class="lb-inv"></ul>
-            <p class="lb-vacio lb-inv-vacio">Todavía no hay nada guardado. Los premios se anotan solos.</p>
-            <button type="button" class="lb-agregar">+ Agregar objeto</button>
-          </div>
-
-          <div class="lb-panel" data-panel="registro" hidden>
-            <div class="lb-reg"></div>
-            <p class="lb-vacio lb-reg-vacio">Ninguna recompensa todavía.</p>
-          </div>
-
-          <div class="lb-panel" data-panel="notas" hidden>
-            <textarea class="lb-notas" placeholder="Anotaciones sueltas…" spellcheck="true"></textarea>
-          </div>
-
-          <div class="lb-pie">
-            <button type="button" class="lb-exportar" title="Descargar la libreta como archivo">⤓ Exportar</button>
-            <label class="lb-importar" title="Cargar una libreta exportada (reemplaza la actual)">⤒ Importar<input type="file" accept=".json,application/json" hidden></label>
-            <button type="button" class="lb-borrar peligro">Borrar libreta</button>
-          </div>
-          <div class="lb-aviso" role="status"></div>
+          <button class="tp-reiniciar" type="button" title="Pone en cero tiradas y buffs. La libreta no se toca.">↺ Reiniciar máquina</button>
         </div>
-      </section>
-    </div>`;
+
+        <div class="lb-pie">
+          <button type="button" class="lb-exportar" title="Descargar la libreta como archivo">⤓ Exportar</button>
+          <label class="lb-importar" title="Cargar una libreta exportada (reemplaza la actual)">⤒ Importar<input type="file" accept=".json,application/json" hidden></label>
+          <button type="button" class="lb-borrar peligro">Borrar libreta</button>
+        </div>
+        <div class="lb-aviso" role="status"></div>
+      </div>
+    </aside>`;
   document.body.appendChild(raiz);
 
-  const rodillos = [...raiz.querySelectorAll(".tp-rodillo")];
   const btnGirar = $(".tp-girar", raiz);
-  let abierta = false, girando = false, nuevas = 0, tab = "inventario";
-
-  /* ----- Rodillos 3D ----- */
-
-  const mod = (a, n) => ((a % n) + n) % n;
-  const R3 = rodillos.map((r) => ({
-    cil: r.querySelector(".tp-cilindro"),
-    caras: [...r.querySelectorAll(".tp-cara")],
-    nombre: r.querySelector(".tp-nombre"),
-    ang: 0, radio: 0, listo: false,
-  }));
-  const pocoMovimiento = matchMedia("(prefers-reduced-motion: reduce)");
-
-  function geometria() {
-    R3.forEach((R) => {
-      const h = R.caras[0].offsetHeight || 120;
-      R.radio = h / 2 / Math.tan(Math.PI / CARAS);
-      R.caras.forEach((c, k) => { c.style.transform = `rotateX(${k * PASO}deg) translateZ(${R.radio}px)`; });
-      rotar(R, R.ang);
-    });
-  }
-
-  function rotar(R, ang) {
-    R.ang = ang;
-    R.cil.style.transform = `translateZ(${-R.radio}px) rotateX(${ang}deg)`;
-  }
-
-  const frenteDe = (R) => mod(Math.round(-R.ang / PASO), CARAS);
-
-  function cara(R, k, t) {
-    const c = R.caras[k], img = c.firstElementChild;
-    img.src = ruta(t.archivo); img.alt = t.nombre;
-    c.className = "tp-cara " + t.tipo;
-  }
-
-  function mostrarNombre(i, t) {
-    R3[i].nombre.textContent = t ? t.nombre : "";
-    rodillos[i].classList.toggle("dorada", t?.tipo === "dorado");
-    rodillos[i].classList.toggle("especial", t?.tipo === "especial");
-  }
-
-  // Llena los rodillos al azar la primera vez
-  function prepararRodillos() {
-    geometria();
-    R3.forEach((R, i) => {
-      if (R.listo) return;
-      R.caras.forEach((_, k) => cara(R, k, azar(COMUNES)));
-      const t = azar(COMUNES); cara(R, frenteDe(R), t); mostrarNombre(i, t);
-      R.listo = true;
-    });
-  }
-
-  // Sale del punto final, lo pasa un poquito y vuelve (rebote del rodillo al frenar)
-  const frenado = (t) => { const s = 0.9; t -= 1; return 1 + (s + 1) * t * t * t + s * t * t; };
-
-  function girarRodillos(resultado, alTerminar) {
-    const inicio = performance.now();
-    const planes = R3.map((R, i) => {
-      const c = frenteDe(R), k = (c + CARAS / 2) % CARAS;   // la cara de atrás trae el resultado
-      R.caras.forEach((_, j) => {
-        if (j !== k && mod(j - c + 1, CARAS) > 2) cara(R, j, azar(TODAS));
-      });
-      cara(R, k, resultado[i]);
-      const meta = R.ang - 360 * (2 + i * 0.75);
-      const hasta = meta - mod(meta + k * PASO, 360);
-      const dur = pocoMovimiento.matches ? 200 : 1150 + i * 320;
-      mostrarNombre(i, null); R.nombre.textContent = "…";
-      rodillos[i].classList.add("girando");
-      return { R, i, desde: R.ang, hasta, dur, fin: false };
-    });
-    const paso = (ahora) => {
-      let quedan = 0;
-      planes.forEach((p) => {
-        if (p.fin) return;
-        const t = Math.min(1, (ahora - inicio) / p.dur);
-        rotar(p.R, p.desde + (p.hasta - p.desde) * frenado(t));
-        if (t > 0.72) rodillos[p.i].classList.remove("girando");
-        if (t >= 1) { p.fin = true; rotar(p.R, p.hasta); mostrarNombre(p.i, resultado[p.i]); }
-        else quedan++;
-      });
-      if (quedan) requestAnimationFrame(paso); else alTerminar();
-    };
-    requestAnimationFrame(paso);
-  }
+  let visible = false, girando = false, nuevas = 0, tab = "inventario";
+  let libretaAbierta = innerWidth >= 1100;
 
   function pintarMaquina() {
     const M = E.maquina;
     $(".tp-contador", raiz).innerHTML = `Tiradas: <b>${M.tiradas}</b> · Triples: <b>${M.triples}</b>`;
     const p = probabilidades(M.gSeba, M.seba, M.lukas);
     const buffs = [];
-    if (M.lukas) buffs.push("🐴 Lukas: +10% de triple en la próxima tirada");
-    if (M.seba) buffs.push("🎩 Sebastián: +50% de triple en la próxima tirada");
+    if (M.lukas) buffs.push("🐴 Lukas: +10% de triple en la próxima");
+    if (M.seba) buffs.push("🎩 Sebastián: +50% de triple en la próxima");
     if (M.gSeba) buffs.push("🌟 GOLDEN Sebastián: +50% de triple GOLDEN en la próxima");
-    if (M.bonoDorado > 0) buffs.push(`⭐ Bono DORADO permanente: +${Math.round(M.bonoDorado * 100)}%`);
-    if (M.pareja) buffs.push("💕 Caballos emparejados: el próximo GOLDEN Lukas da un potro");
+    if (M.bonoDorado > 0) buffs.push(`⭐ Bono DORADO: +${Math.round(M.bonoDorado * 100)}%`);
+    if (M.pareja) buffs.push("💕 Caballos emparejados");
     const box = $(".tp-buffs", raiz);
     box.innerHTML = "";
-    buffs.forEach((b) => box.append(crear("div", "tp-buff", b)));
-    box.append(crear("div", "tp-probs",
-      `Próxima fila: nada ${pct(p.nada)}% · normal ${pct(p.normal)}% · dorado ${pct(p.dorado)}% · especial ${pct(p.especial)}%`));
+    buffs.forEach((b) => box.append(crear("span", "tp-buff", b)));
+    box.append(crear("span", "tp-probs",
+      `Por fila: nada ${pct(p.nada)}% · normal ${pct(p.normal)}% · dorado ${pct(p.dorado)}% · especial ${pct(p.especial)}%`));
   }
 
   function pintarPremios() {
@@ -406,7 +299,7 @@ const Tragaperras = (() => {
     tab = t;
     raiz.querySelectorAll(".lb-pestanas button").forEach((b) => b.classList.toggle("activa", b.dataset.tab === t));
     raiz.querySelectorAll(".lb-panel").forEach((p) => { p.hidden = p.dataset.panel !== t; });
-    if (t === "registro") { nuevas = 0; pintarNuevas(); }
+    if (t === "registro" && libretaAbierta) { nuevas = 0; pintarNuevas(); }
     if (t === "inventario") raiz.querySelectorAll(".lb-nombre").forEach((n) => { n.style.height = "auto"; n.style.height = n.scrollHeight + "px"; });
   }
 
@@ -428,12 +321,29 @@ const Tragaperras = (() => {
     clearTimeout(tAviso); tAviso = setTimeout(() => { a.textContent = ""; }, 4000);
   }
 
+
+  /* ----- Libreta: abrir/cerrar el panel ----- */
+
+  function ponerLibreta(abierta) {
+    libretaAbierta = abierta;
+    raiz.classList.toggle("con-libreta", abierta);
+    $(".tp-abrir-libreta", raiz).setAttribute("aria-expanded", String(abierta));
+    if (abierta && tab === "registro") { nuevas = 0; pintarNuevas(); }
+    ajustarMargenes();
+  }
+
+  function ajustarMargenes() {
+    if (!maq()) return;
+    const panel = $(".tp-panel", raiz).getBoundingClientRect();
+    const ancho = innerWidth >= 900 && libretaAbierta ? $(".tp-libreta", raiz).offsetWidth + 24 : 0;
+    maq().margenes({ der: ancho, inf: visible ? innerHeight - panel.top + 10 : 0 });
+  }
+
   /* ----- Girar ----- */
 
-  function girar() {
-    if (girando) return;
+  function tirar() {
+    if (girando || !visible || !maq()) return;
     girando = true; btnGirar.disabled = true;
-    rodillos.forEach((r) => r.classList.remove("gana"));
     $(".tp-resultado", raiz).textContent = "Girando… 🎲";
 
     const M = E.maquina;
@@ -443,89 +353,76 @@ const Tragaperras = (() => {
     const filas = [tirarFila(p), tirarFila(p)];
     const grilla = [...filas[0].celdas, ...filas[1].celdas];
 
-    const palanca = $(".tp-palanca3d", raiz);
-    palanca.classList.remove("tirando"); void palanca.offsetWidth; palanca.classList.add("tirando");
-    girarRodillos(grilla, () => {
+    maq().girar(grilla, () => {
       M.tiradas++;
-
       const res = $(".tp-resultado", raiz);
       res.innerHTML = "";
-      let hubo = false;
+      const ganadoras = [];
       filas.forEach((f, n) => {
         const [a, b, c] = f.celdas;
         const linea = crear("p");
         if (a === b && b === c) {
-          hubo = true;
-          [0, 1, 2].forEach((k) => rodillos[n * 3 + k].classList.add("gana"));
+          ganadoras.push(n);
           const { texto } = premiar(a, ctx);
           E.registro.push({ fecha: new Date().toISOString(), tirada: M.tiradas, nombre: a.nombre, tipo: a.tipo, texto });
           linea.className = "premio " + a.tipo;
           linea.append(crear("b", null, `Fila ${n + 1}: ¡TRIPLE ${a.nombre}! `), document.createTextNode(texto));
-          if (abierta && tab !== "registro") nuevas++;
+          if (!(libretaAbierta && tab === "registro")) nuevas++;
         } else {
           linea.textContent = `Fila ${n + 1}: ${a.nombre} · ${b.nombre} · ${c.nombre}`;
         }
         res.append(linea);
       });
-      if (!hubo && (ctx.gSeba || ctx.seba || ctx.lukas)) res.append(crear("p", "nota", "Se consumieron los buffs de la tirada anterior."));
-      if (hubo) { raiz.querySelector(".lb-hoja").classList.remove("anota"); void raiz.offsetWidth; raiz.querySelector(".lb-hoja").classList.add("anota"); }
-
+      if (!ganadoras.length && (ctx.gSeba || ctx.seba || ctx.lukas)) res.append(crear("p", "nota", "Se consumieron los buffs de la tirada anterior."));
+      maq().celebrar(ganadoras);
+      if (ganadoras.length) { const h = $(".lb-hoja", raiz); h.classList.remove("anota"); void h.offsetWidth; h.classList.add("anota"); }
       guardar();
       pintarMaquina();
       pintarLibreta();
       girando = false; btnGirar.disabled = false;
-      btnGirar.focus();
+      requestAnimationFrame(ajustarMargenes);
     });
   }
 
-  /* ----- Abrir / cerrar ----- */
+  /* ----- Al enfocar / salir (lo llama la mesa 3D) ----- */
 
-  let precargadas = false;
-  function abrir(enTab) {
-    if (!App.sesion || abierta) return;
+  function alEnfocar() {
+    if (!App.sesion) return;
     cargar();
-    if (!precargadas) { TODAS.forEach((t) => { new Image().src = ruta(t.archivo); }); precargadas = true; }
-    abierta = true;
+    visible = true;
     Libro.habilitar(false);
     raiz.classList.add("visible");
     raiz.setAttribute("aria-hidden", "false");
-    prepararRodillos();
     pintarMaquina();
     pintarLibreta();
-    cambiarTab(enTab || tab);
-    setTimeout(() => (enTab ? raiz.querySelector(`[data-tab="${enTab}"]`) : btnGirar).focus(), 60);
+    cambiarTab(tab);
+    ponerLibreta(innerWidth >= 1100 ? libretaAbierta : false);
+    setTimeout(() => btnGirar.focus({ preventScroll: true }), 50);
   }
 
-  function cerrar() {
-    if (!abierta || girando) return;
-    abierta = false;
+  function alSalir() {
+    if (!visible) return;
+    visible = false;
     raiz.classList.remove("visible");
     raiz.setAttribute("aria-hidden", "true");
     if (App.sesion) Libro.habilitar(true);
+    if (document.activeElement && raiz.contains(document.activeElement)) document.activeElement.blur();
   }
+
+  const volver = () => { if (!girando) maq()?.salir(); };
 
   /* ----- Eventos ----- */
 
-  btnGirar.addEventListener("click", girar);
-  $(".tp-palanca3d", raiz).addEventListener("click", girar);
-  addEventListener("resize", () => { if (abierta) geometria(); });
-
-  // El gabinete se inclina un poco siguiendo el mouse
-  const gabinete = $(".tp-gabinete", raiz);
-  raiz.addEventListener("pointermove", (e) => {
-    if (e.pointerType !== "mouse" || pocoMovimiento.matches) return;
-    const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5;
-    gabinete.style.setProperty("--ry", (-24 + x * 16).toFixed(2) + "deg");
-    gabinete.style.setProperty("--rx", (4 - y * 8).toFixed(2) + "deg");
-  });
-  raiz.addEventListener("pointerleave", () => { gabinete.style.removeProperty("--ry"); gabinete.style.removeProperty("--rx"); });
-  $(".tp-cerrar", raiz).addEventListener("click", cerrar);
-  raiz.addEventListener("click", (e) => { if (e.target === raiz) cerrar(); });
+  btnGirar.addEventListener("click", tirar);
+  $(".tp-volver", raiz).addEventListener("click", volver);
+  $(".tp-abrir-libreta", raiz).addEventListener("click", () => ponerLibreta(!libretaAbierta));
+  $(".lb-cerrar", raiz).addEventListener("click", () => ponerLibreta(false));
   $(".tp-reiniciar", raiz).addEventListener("click", () => {
     if (girando) return;
     E.maquina = nuevaMaquina(); guardar(); pintarMaquina();
     $(".tp-resultado", raiz).textContent = "Máquina reiniciada. La libreta quedó como estaba.";
   });
+  addEventListener("resize", () => { if (visible) ajustarMargenes(); });
 
   raiz.querySelectorAll(".lb-pestanas button").forEach((b) => b.addEventListener("click", () => cambiarTab(b.dataset.tab)));
   $(".lb-notas", raiz).addEventListener("input", (e) => { E.notas = e.target.value; guardar(); });
@@ -571,16 +468,18 @@ const Tragaperras = (() => {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (!abierta) return;
-    if (e.key === "Escape") { e.preventDefault(); cerrar(); }
+    if (!visible) return;
+    const escribiendo = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if (e.key === "Escape") { e.preventDefault(); if (escribiendo) e.target.blur(); else volver(); return; }
+    if ((e.key === " " || e.key === "Enter") && !escribiendo && e.target.tagName !== "BUTTON" && e.target.tagName !== "LABEL") {
+      e.preventDefault(); tirar();
+    }
   });
 
-  // Objetos del escritorio
-  $("#mesa-tragaperras")?.addEventListener("click", () => abrir());
-  $("#mesa-libreta")?.addEventListener("click", () => abrir("registro"));
-  $("#btn-salir")?.addEventListener("click", () => { girando = false; cerrar(); }, true);
+  // Al salir de la cuenta, la cámara vuelve al escritorio
+  $("#btn-salir")?.addEventListener("click", () => { girando = false; maq()?.salir(true); }, true);
 
   pintarPremios();
 
-  return { abrir, cerrar };
+  return { tirar, alEnfocar, alSalir };
 })();

@@ -68,13 +68,13 @@ Funciona con mouse y con el dedo en el celular. Los dados rebotan contra los bor
   como un trompo; si no, rebotan y terminan girando y tambaleándose sobre la mesa hasta quedar planas.
 
 ## Tragaperras del Fuerte
-Sobre el escritorio (a la derecha) hay una **tragaperras** y una **libreta**. Tocá la máquina para jugar (botón «Girar» o la palanca del costado: los rodillos son cilindros 3D y el gabinete se inclina siguiendo el mouse);
-tocá la libreta para ir directo a las recompensas. `Esc` vuelve al escritorio.
+Sobre la mesa hay una **tragaperras 3D**: choca con los dados y se arrastra como los libros (mantener apretado).
 
-- Cada triple se anota solo en la libreta, con **fecha y hora**, y suma al **inventario**.
-- El inventario se edita a mano: cambiar nombre, cantidad (− / +), quitar o agregar objetos. También hay una pestaña de notas.
-- La libreta es **de cada cuenta y queda guardada en ese navegador**. Para pasarla a otra
-  computadora: **⤓ Exportar** y después **⤒ Importar** allá.
+- **Un clic** en la máquina: la cámara se pone de frente.
+- **Tirar de la palanca**: clic en la bola roja o arrastrarla hacia abajo. También sirven el botón rojo, «Girar» o la barra espaciadora.
+- **← Volver al escritorio** (abajo a la izquierda) o `Esc`.
+- Cada triple se anota solo en la **libreta** (a la derecha): registro con fecha y hora, **inventario editable**, notas y tabla de premios.
+- La libreta es **de cada cuenta y queda guardada en ese navegador**. Para pasarla a otra computadora: **⤓ Exportar** y después **⤒ Importar**.
 - Personajes, premios y probabilidades: `js/tragaperras-datos.js`. Imágenes: `img/tragaperras/`.
   Los personajes sin `normal`/`golden` salen en la máquina, pero su premio dice «a definir por el DM».
 
@@ -87,7 +87,7 @@ tocá la libreta para ir directo a las recompensas. `Esc` vuelve al escritorio.
 - `js/editor.js`: el editor y el guardado en GitHub.
 - `js/app.js`: login y sesión.
 - `js/config.js`: usuario y repositorio de GitHub.
-- `js/tragaperras.js` + `css/tragaperras.css`: la tragaperras y la libreta. `js/tragaperras-datos.js`: sus premios.
+- `js/tragaperras.js` + `css/tragaperras.css`: reglas, premios, libreta y controles de la tragaperras (el mueble 3D está en `js/dados.js`). `js/tragaperras-datos.js`: sus datos.
 - `js/dados.js`: la mesa en 3D (dados, monedas y vela) y su física.
 - `vendor/three.min.js`: three.js r149 (licencia MIT, en `vendor/three-LICENSE.txt`).
 - `data/diario.enc.js`: **el diario cifrado** (no se toca a mano).

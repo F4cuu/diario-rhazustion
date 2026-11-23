@@ -44,57 +44,6 @@
       <div id="libro" aria-label="Diario de Rhazustión"></div>
     </div>
 
-    <!-- ===== Tragaperras del Fuerte y su libreta (sobre el escritorio) ===== -->
-    <button id="mesa-tragaperras" class="mesa-objeto" type="button" title="Tragaperras del Fuerte" aria-label="Jugar a la tragaperras del Fuerte">
-      <svg viewBox="0 0 124 150" aria-hidden="true">
-        <defs>
-          <linearGradient id="tpCuerpo" x1="0" x2="1"><stop offset="0" stop-color="#4a120c"/><stop offset=".45" stop-color="#8a2a1a"/><stop offset="1" stop-color="#3a0d08"/></linearGradient>
-          <linearGradient id="tpOro" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset="1" stop-color="#b8862b"/></linearGradient>
-        </defs>
-        <path d="M14 34 Q14 8 52 8 Q90 8 90 34 Z" fill="url(#tpCuerpo)" stroke="url(#tpOro)" stroke-width="3"/>
-        <text x="52" y="29" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="11" fill="#ffe08a">FUERTE</text>
-        <rect x="8" y="34" width="88" height="92" rx="8" fill="url(#tpCuerpo)" stroke="url(#tpOro)" stroke-width="3"/>
-        <rect x="16" y="44" width="72" height="30" rx="4" fill="#1a0a05" stroke="#d4ac57" stroke-width="1.5"/>
-        <rect x="19" y="47" width="20" height="24" rx="2" fill="#f3e6c6"/>
-        <rect x="42" y="47" width="20" height="24" rx="2" fill="#f3e6c6"/>
-        <rect x="65" y="47" width="20" height="24" rx="2" fill="#f3e6c6"/>
-        <text x="29" y="64" text-anchor="middle" font-size="13" fill="#b8862b">★</text>
-        <text x="52" y="64" text-anchor="middle" font-size="13" fill="#b8862b">★</text>
-        <text x="75" y="64" text-anchor="middle" font-size="13" fill="#b8862b">★</text>
-        <rect x="16" y="82" width="72" height="10" rx="3" fill="#2a0c06" stroke="#d4ac57" stroke-width="1"/>
-        <circle cx="30" cy="106" r="7" fill="url(#tpOro)" stroke="#6e4200" stroke-width="1.5"/>
-        <rect x="44" y="101" width="38" height="10" rx="5" fill="#1a0a05" stroke="#d4ac57" stroke-width="1"/>
-        <rect x="4" y="124" width="96" height="14" rx="4" fill="#3a1d0e" stroke="#b8862b" stroke-width="2"/>
-        <g class="tp-palanca">
-          <rect x="96" y="66" width="10" height="10" rx="2" fill="#6e4200"/>
-          <path d="M104 70 L114 40" stroke="#c9c2b0" stroke-width="4" stroke-linecap="round"/>
-          <circle cx="114" cy="36" r="8" fill="#b51e14" stroke="#4a0b06" stroke-width="2"/>
-          <circle cx="111" cy="33" r="2.5" fill="#ffb3a8" opacity=".8"/>
-        </g>
-      </svg>
-      <span class="etiqueta">Tragaperras</span>
-    </button>
-
-    <button id="mesa-libreta" class="mesa-objeto" type="button" title="Libreta de recompensas" aria-label="Abrir la libreta de recompensas">
-      <svg viewBox="0 0 80 100" aria-hidden="true">
-        <rect x="6" y="4" width="66" height="90" rx="5" fill="#5b2217" stroke="#2e0f09" stroke-width="2"/>
-        <rect x="10" y="7" width="60" height="84" rx="3" fill="#efe3c6"/>
-        <g stroke="#7d8fa8" stroke-width=".8" opacity=".6">
-          <line x1="20" y1="24" x2="64" y2="24"/><line x1="20" y1="34" x2="64" y2="34"/><line x1="20" y1="44" x2="64" y2="44"/>
-          <line x1="20" y1="54" x2="64" y2="54"/><line x1="20" y1="64" x2="64" y2="64"/><line x1="20" y1="74" x2="64" y2="74"/>
-        </g>
-        <path d="M22 22 q6 -4 10 0 t10 0 M22 32 q8 -3 14 0 M22 42 q5 -3 9 0 t12 0" fill="none" stroke="#3b2a1a" stroke-width="1.2"/>
-        <g fill="#2b1d12">
-          <circle cx="10" cy="16" r="3"/><circle cx="10" cy="30" r="3"/><circle cx="10" cy="44" r="3"/>
-          <circle cx="10" cy="58" r="3"/><circle cx="10" cy="72" r="3"/><circle cx="10" cy="86" r="3"/>
-        </g>
-        <rect x="56" y="4" width="5" height="90" fill="#7a1f12" opacity=".85"/>
-        <path d="M30 96 L74 52" stroke="#c9962f" stroke-width="5" stroke-linecap="round"/>
-        <path d="M70 56 L74 52 L77 48" stroke="#3b2a1a" stroke-width="5" stroke-linecap="round"/>
-      </svg>
-      <span class="etiqueta">Libreta</span>
-    </button>
-
     <div id="aviso">Doble clic en un libro para abrirlo<span class="sep"> · </span><span class="linea2">Mantené apretado para mover las cosas · Un clic apaga la vela</span></div>
 
     <nav id="controles" aria-label="Navegación del diario">
@@ -185,11 +134,11 @@
   <script src="js/cripto.js"></script>
   <script src="js/paginador.js"></script>
   <script src="js/libro.js"></script>
+  <script src="js/tragaperras-datos.js"></script>
   <script src="vendor/three.min.js"></script>
   <script src="js/dados.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/app.js"></script>
-  <script src="js/tragaperras-datos.js"></script>
   <script src="js/tragaperras.js"></script>
 </body>
 </html>

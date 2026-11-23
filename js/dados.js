@@ -870,6 +870,465 @@ const Dados = (() => {
   }
 
   /* =================================================================
+     5c. LA TRAGAPERRAS DEL FUERTE (un mueble más de la mesa)
+     - Choca con los dados y se arrastra como los libros.
+     - Un clic la enfoca: la cámara se pone de frente para tirar de la palanca.
+     - Las reglas, los premios y la libreta están en js/tragaperras.js;
+       acá solo se dibuja y se anima.
+     ================================================================= */
+
+  const MAQ = { ancho: 3.4, fondo: 2.4, alto: 3.7, base: 0.34, arco: 1.15 };
+  const N_CARAS = 8, PASO_R = (2 * Math.PI) / N_CARAS, RADIO_R = 0.5, ANCHO_R = 0.8;
+  const FILAS_Y = [2.74, 1.64], COLS_X = [-1.0, 0, 1.0];
+  const FICHA = 256, TEX_W = FICHA * N_CARAS, TEX_H = 512;
+  const PAL_REPOSO = -0.18, PAL_TOPE = 1.6;
+  let maquina = null, mesaMadera = null, luzFrente = null;
+
+  const imagenesTP = new Map();
+  let rodillosSucios = false;
+  function imagenTP(archivo) {
+    let im = imagenesTP.get(archivo);
+    if (!im) {
+      im = new Image();
+      im.onload = () => { rodillosSucios = true; };
+      im.src = (window.TRAGAPERRAS?.carpeta || "img/tragaperras/") + encodeURIComponent(archivo);
+      imagenesTP.set(archivo, im);
+    }
+    return im;
+  }
+
+  // Fichas que pueden salir (las mismas que usa el motor de premios)
+  function fichasTP() {
+    const C = window.TRAGAPERRAS;
+    if (!C) return [];
+    return [
+      ...C.personajes.map((p) => ({ nombre: p.nombre, archivo: p.archivo, tipo: "normal" })),
+      ...C.personajes.filter((p) => p.dorado).map((p) => ({ nombre: "GOLDEN " + p.nombre, archivo: p.dorado, tipo: "dorado" })),
+    ];
+  }
+
+  const FONDO_FICHA = { normal: ["#fffaf0", "#dccca4"], dorado: ["#fff3c4", "#cfa246"], especial: ["#f7e8ff", "#a77cc0"] };
+
+  // Dibuja la ficha k del rodillo. En la textura, x va "alrededor" del cilindro
+  // (hacia arriba en pantalla) e y a lo largo del eje (hacia la derecha).
+  function pintarFichaTP(R, k) {
+    const c = R.ctx, t = R.fichas[k], x0 = k * FICHA;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    const [claro, oscuro] = FONDO_FICHA[t?.tipo || "normal"];
+    const g = c.createLinearGradient(x0, 0, x0 + FICHA, 0);
+    g.addColorStop(0, oscuro); g.addColorStop(0.5, claro); g.addColorStop(1, oscuro);
+    c.fillStyle = g; c.fillRect(x0, 0, FICHA, TEX_H);
+    c.fillStyle = "rgba(80,50,15,.45)"; c.fillRect(x0, 0, 3, TEX_H);
+    if (t) {
+      const im = imagenTP(t.archivo);
+      if (im.complete && im.naturalWidth) {
+        c.setTransform(0, 1, -1, 0, x0 + FICHA / 2, TEX_H / 2);   // imagen derecha en pantalla
+        const s = 244;
+        c.drawImage(im, -s / 2, -s / 2, s, s);
+        c.setTransform(1, 0, 0, 1, 0, 0);
+      }
+    }
+    R.tex.needsUpdate = true;
+  }
+
+  function crearRodillo() {
+    const lienzo = document.createElement("canvas"); lienzo.width = TEX_W; lienzo.height = TEX_H;
+    const tex = new T.CanvasTexture(lienzo); tex.encoding = T.sRGBEncoding; tex.anisotropy = 8;
+    const geo = new T.CylinderGeometry(RADIO_R, RADIO_R, ANCHO_R, 72, 1, false);
+    geo.rotateZ(Math.PI / 2);   // eje a lo ancho de la máquina
+    const lado = new T.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0 });
+    const tapa = new T.MeshStandardMaterial({ color: 0x24150a, roughness: 0.8 });
+    const malla = new T.Mesh(geo, [lado, tapa, tapa]);
+    return { malla, tex, ctx: lienzo.getContext("2d"), fichas: new Array(N_CARAS).fill(null), ang: 0, anim: null };
+  }
+
+  // La ficha k queda al frente cuando el ángulo del rodillo es (k + ½)·paso
+  const frenteTP = (R) => ((Math.round(R.ang / PASO_R - 0.5) % N_CARAS) + N_CARAS) % N_CARAS;
+
+  function crearMaquina() {
+    const { ancho, fondo, alto, base, arco } = MAQ, zf = fondo / 2;
+    const grupo = new T.Group(), cuerpo = new T.Group();
+    grupo.add(cuerpo);
+
+    const laca = new T.MeshPhysicalMaterial({ color: 0x5e0d07, roughness: 0.42, clearcoat: 0.8, clearcoatRoughness: 0.2 });
+    const oro = new T.MeshStandardMaterial({ color: 0xd4ac57, metalness: 0.9, roughness: 0.3 });
+    const oscuro = new T.MeshStandardMaterial({ color: 0x140904, roughness: 0.9 });
+    const madera = new T.MeshStandardMaterial({ color: 0x3a1d0e, roughness: 0.7 });
+    const cromo = new T.MeshStandardMaterial({ color: 0xe8e4da, metalness: 1, roughness: 0.18 });
+    const rojo = new T.MeshPhysicalMaterial({ color: 0xc0180e, roughness: 0.25, clearcoat: 1, emissive: 0x400000, emissiveIntensity: 0.4 });
+
+    const poner = (geo, mat, x, y, z, padre = cuerpo) => {
+      const m = new T.Mesh(geo, mat);
+      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+      padre.add(m); return m;
+    };
+
+    // zócalo de madera con filete dorado
+    poner(new T.BoxGeometry(ancho + 0.36, base, fondo + 0.3), madera, 0, base / 2, 0);
+    poner(new T.BoxGeometry(ancho + 0.4, 0.06, fondo + 0.34), oro, 0, base, 0);
+
+    // cuerpo y frente (el frente tiene una ventana por rodillo)
+    const prof = 0.55, zPanel = zf - prof;
+    poner(new T.BoxGeometry(ancho, alto - base, zPanel + zf), laca, 0, base + (alto - base) / 2, (zPanel - zf) / 2);
+    const VW = 0.88, VH = 0.7;
+    const forma = new T.Shape();
+    forma.moveTo(-ancho / 2, base); forma.lineTo(ancho / 2, base); forma.lineTo(ancho / 2, alto); forma.lineTo(-ancho / 2, alto); forma.closePath();
+    FILAS_Y.forEach((y) => COLS_X.forEach((x) => {
+      const h = new T.Path();
+      h.moveTo(x - VW / 2, y - VH / 2); h.lineTo(x - VW / 2, y + VH / 2); h.lineTo(x + VW / 2, y + VH / 2); h.lineTo(x + VW / 2, y - VH / 2); h.closePath();
+      forma.holes.push(h);
+    }));
+    poner(new T.ExtrudeGeometry(forma, { depth: prof, bevelEnabled: false }), [laca, oscuro], 0, 0, zPanel);
+    [-1, 1].forEach((s) => poner(new T.BoxGeometry(0.1, alto - base, prof + 0.04), oro, s * ancho / 2, base + (alto - base) / 2, zPanel + prof / 2));
+    poner(new T.BoxGeometry(ancho + 0.1, 0.1, fondo + 0.04), oro, 0, alto, 0);
+
+    // marcos dorados de las ventanas (uno por fila, para que brillen al ganar)
+    const marcos = FILAS_Y.map((y) => {
+      const mat = oro.clone(); mat.emissive = new T.Color(0xffc040); mat.emissiveIntensity = 0;
+      COLS_X.forEach((x) => {
+        poner(new T.BoxGeometry(VW + 0.12, 0.06, 0.08), mat, x, y + VH / 2 + 0.03, zf + 0.02);
+        poner(new T.BoxGeometry(VW + 0.12, 0.06, 0.08), mat, x, y - VH / 2 - 0.03, zf + 0.02);
+        poner(new T.BoxGeometry(0.06, VH, 0.08), mat, x - VW / 2 - 0.03, y, zf + 0.02);
+        poner(new T.BoxGeometry(0.06, VH, 0.08), mat, x + VW / 2 + 0.03, y, zf + 0.02);
+      });
+      return mat;
+    });
+
+    // rodillos y vidrio
+    const vidrio = new T.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.07, roughness: 0.04, metalness: 0, envMapIntensity: 2, depthWrite: false });
+    const rodillos = [];
+    FILAS_Y.forEach((y) => COLS_X.forEach((x) => {
+      const R = crearRodillo();
+      R.malla.position.set(x, y, zf - 0.1 - RADIO_R);
+      R.malla.receiveShadow = true;
+      cuerpo.add(R.malla);
+      rodillos.push(R);
+      const v = new T.Mesh(new T.PlaneGeometry(VW, VH), vidrio);
+      v.position.set(x, y, zf - 0.04);
+      cuerpo.add(v);
+    }));
+
+    // repisa con botón y ranura, y bandeja de monedas
+    poner(new T.BoxGeometry(ancho - 0.1, 0.12, 0.5), laca, 0, 0.98, zf + 0.22);
+    poner(new T.BoxGeometry(ancho - 0.06, 0.04, 0.54), oro, 0, 1.05, zf + 0.22);
+    const boton = poner(new T.CylinderGeometry(0.19, 0.22, 0.14, 32), rojo, 0.95, 1.13, zf + 0.25);
+    poner(new T.CylinderGeometry(0.27, 0.27, 0.05, 32), oro, 0.95, 1.08, zf + 0.25);
+    poner(new T.BoxGeometry(0.42, 0.05, 0.16), oro, -0.95, 1.08, zf + 0.25);
+    poner(new T.BoxGeometry(0.3, 0.06, 0.04), oscuro, -0.95, 1.1, zf + 0.25);
+    poner(new T.BoxGeometry(1.7, 0.36, 0.22), oscuro, 0, 0.6, zf + 0.04);
+    poner(new T.BoxGeometry(1.82, 0.06, 0.3), oro, 0, 0.42, zf + 0.08);
+
+    // marquesina con el cartel y las lamparitas
+    const fondoArco = fondo - 0.3;
+    const arcoForma = new T.Shape();
+    arcoForma.moveTo(ancho / 2, 0);
+    arcoForma.absellipse(0, 0, ancho / 2, arco, 0, Math.PI, false);
+    arcoForma.lineTo(ancho / 2, 0);
+    poner(new T.ExtrudeGeometry(arcoForma, { depth: fondoArco, bevelEnabled: false, curveSegments: 48 }), [laca, laca], 0, alto, -fondoArco / 2);
+    const zArco = fondoArco / 2;
+    const ra = ancho / 2 - 0.16, rb = arco - 0.13;
+    const cartelForma = new T.Shape();
+    cartelForma.moveTo(ra, 0); cartelForma.absellipse(0, 0, ra, rb, 0, Math.PI, false); cartelForma.lineTo(ra, 0);
+    const texCartel = lienzoTextura(1024, 360, (c, w, h) => {
+      const g = c.createRadialGradient(w / 2, h, 40, w / 2, h * 0.7, w * 0.6);
+      g.addColorStop(0, "#5a0d08"); g.addColorStop(1, "#1e0402");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.shadowColor = "rgba(255,170,40,.9)"; c.shadowBlur = 22;
+      c.fillStyle = "#ffd76a";
+      c.font = '700 92px "Cinzel", serif'; c.fillText("TRAGAPERRAS", w / 2, h * 0.6);
+      c.font = '700 54px "Cinzel", serif'; c.fillText("DEL FUERTE", w / 2, h * 0.86);
+    });
+    texCartel.repeat.set(1 / (2 * ra), 1 / rb); texCartel.offset.set(0.5, 0);
+    const cartel = new T.Mesh(new T.ShapeGeometry(cartelForma, 48),
+      new T.MeshStandardMaterial({ map: texCartel, emissiveMap: texCartel, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.5 }));
+    cartel.position.set(0, alto + 0.03, zArco + 0.006);
+    cuerpo.add(cartel);
+    const curva = new T.EllipseCurve(0, 0, ancho / 2 - 0.04, arco - 0.04, 0, Math.PI, false);
+    const puntos = curva.getPoints(64).map((p) => new T.Vector3(p.x, p.y + alto, zArco + 0.02));
+    poner(new T.TubeGeometry(new T.CatmullRomCurve3(puntos), 96, 0.045, 8), oro, 0, 0, 0);
+    const lamparitas = [];
+    for (let i = 0; i < 13; i++) {
+      const a = Math.PI * (0.06 + 0.88 * (i / 12));
+      const mat = new T.MeshStandardMaterial({ color: 0xfff0c8, emissive: 0xffc35a, emissiveIntensity: 0.3, roughness: 0.3 });
+      const b = new T.Mesh(new T.SphereGeometry(0.07, 16, 10), mat);
+      b.position.set(Math.cos(a) * (ancho / 2 - 0.04), alto + Math.sin(a) * (arco - 0.04), zArco + 0.07);
+      cuerpo.add(b); lamparitas.push(mat);
+    }
+
+    // palanca (costado derecho): gira hacia adelante y abajo
+    poner(new T.BoxGeometry(0.08, 0.8, 0.8), oro, ancho / 2 + 0.04, 2.05, -0.1);
+    const piv = new T.Group(); piv.position.set(ancho / 2 + 0.2, 2.05, -0.1); cuerpo.add(piv);
+    const eje = poner(new T.CylinderGeometry(0.28, 0.28, 0.26, 32).rotateZ(Math.PI / 2), oro, 0, 0, 0, piv);
+    const vara = poner(new T.CylinderGeometry(0.055, 0.07, 1.9, 16), cromo, 0.17, 0.95, 0, piv);
+    const bola = poner(new T.SphereGeometry(0.27, 32, 20), rojo, 0.17, 1.95, 0, piv);
+    piv.rotation.x = PAL_REPOSO;
+
+    mundo.add(grupo);
+    const mallas = [];
+    cuerpo.traverse((o) => { if (o.isMesh && o.material !== vidrio) mallas.push(o); });
+
+    return {
+      clave: "tragaperras", esLibro: true, esMaquina: true,
+      grupo, cuerpo, mallas, pintar() {},
+      p: new T.Vector3(), yaw: -0.12, v: new T.Vector3(), ant: new T.Vector3(),
+      hx: (ancho + 0.36) / 2 + 0.35, hz: zf + 0.48, alto,
+      levante: 0, inclin: new T.Vector3(), inclinVel: new T.Vector3(),
+      sostenido: false, objetivo: new T.Vector3(), agarre: new T.Vector3(),
+      rodillos, marcos, lamparitas, piv, piezasPalanca: [eje, vara, bola], boton,
+      palanca: { ang: PAL_REPOSO, vel: 0, modo: "libre", arr: null },
+      luces: { modo: "quieto", hasta: 0 }, brilloFila: [0, 0], pulsado: 0,
+    };
+  }
+
+  function llenarRodillos() {
+    const F = fichasTP();
+    if (!F.length || !maquina) return false;
+    maquina.rodillos.forEach((R) => {
+      for (let k = 0; k < N_CARAS; k++) { R.fichas[k] = F[Math.floor(Math.random() * F.length)]; }
+      R.ang = (Math.floor(Math.random() * N_CARAS) + 0.5) * PASO_R;
+      R.malla.rotation.x = R.ang;
+      for (let k = 0; k < N_CARAS; k++) pintarFichaTP(R, k);
+    });
+    return true;
+  }
+
+  // Mesa de madera en 3D: solo se ve de cerca (la de arriba es una imagen 2D)
+  function crearMesaMadera() {
+    const tex = lienzoTextura(1024, 1024, (c, w, h) => {
+      const g = c.createLinearGradient(0, 0, w, 0);
+      g.addColorStop(0, "#47291a"); g.addColorStop(0.25, "#5a3520"); g.addColorStop(0.5, "#4a2b1b"); g.addColorStop(0.75, "#5c3621"); g.addColorStop(1, "#42261a");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 3) { c.fillStyle = `rgba(${Math.random() < 0.5 ? "0,0,0" : "255,225,180"},${0.03 + Math.random() * 0.05})`; c.fillRect(0, y, w, 1); }
+      for (let i = 0; i < 4; i++) { c.fillStyle = "rgba(0,0,0,.6)"; c.fillRect(i * 256 + 253, 0, 3, h); }
+    });
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.repeat.set(2.6, 1.6);
+    const alfa = lienzoTextura(256, 256, (c, w, h) => {
+      const g = c.createRadialGradient(w / 2, h / 2, w * 0.12, w / 2, h / 2, w * 0.5);
+      g.addColorStop(0, "#fff"); g.addColorStop(1, "#000");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+    });
+    alfa.encoding = T.LinearEncoding;
+    const m = new T.Mesh(new T.PlaneGeometry(84, 56),
+      new T.MeshStandardMaterial({ map: tex, alphaMap: alfa, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.22, transparent: true, opacity: 0, roughness: 0.78, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.y = -0.02; m.visible = false; m.renderOrder = -1;
+    mundo.add(m);
+    return m;
+  }
+
+  /* ----- Cámara: escritorio ↔ frente de la máquina ----- */
+
+  const enfoque = { meta: 0, b: 0 };
+  const TP = () => (typeof Tragaperras !== "undefined" ? Tragaperras : null);
+  const margenesTP = { der: 0, inf: 0 };
+  const camEscritorio = { pos: new T.Vector3(0, 32, 10), mira: new T.Vector3() };
+  const camFoco = { pos: new T.Vector3(), mira: new T.Vector3() };
+  const miraTmp = new T.Vector3();
+  const suave = (x) => x * x * (3 - 2 * x);
+  const enfocada = () => enfoque.meta === 1;
+
+  function poseEnfoque(pos, mira) {
+    const M = maquina;
+    const f = new T.Vector3(Math.sin(M.yaw), 0, Math.cos(M.yaw));
+    const der = new T.Vector3(Math.cos(M.yaw), 0, -Math.sin(M.yaw));
+    const tanF = Math.tan((camara.fov * Math.PI) / 360);
+    const fw = Math.max(0.35, (innerWidth - margenesTP.der) / innerWidth);
+    const fh = Math.max(0.45, (innerHeight - margenesTP.inf) / innerHeight);
+    const altoM = MAQ.alto + MAQ.arco + 0.5, anchoM = MAQ.ancho + 1.5;
+    const dist = Math.max(altoM / (0.92 * fh * 2 * tanF), anchoM / (0.94 * fw * 2 * tanF * camara.aspect));
+    const visH = 2 * tanF * dist, visW = visH * camara.aspect;
+    mira.set(M.p.x, (MAQ.alto + MAQ.arco) / 2 + 0.1, M.p.z).addScaledVector(f, 0.7)
+      .addScaledVector(der, (visW * margenesTP.der) / (2 * innerWidth) + 0.18);
+    mira.y -= (visH * margenesTP.inf) / (2 * innerHeight);
+    const elev = 0.26;
+    pos.copy(mira).addScaledVector(f, dist * Math.cos(elev));
+    pos.y += dist * Math.sin(elev);
+  }
+
+  function aplicarCamara() {
+    if (!maquina) return;
+    const e = suave(enfoque.b);
+    poseEnfoque(camFoco.pos, camFoco.mira);
+    camara.position.lerpVectors(camEscritorio.pos, camFoco.pos, e);
+    // un arco: a mitad de camino la cámara va un poco más alta
+    camara.position.y += Math.sin(Math.PI * e) * 3;
+    miraTmp.lerpVectors(camEscritorio.mira, camFoco.mira, e);
+    camara.lookAt(miraTmp);
+    camara.updateMatrixWorld();
+  }
+
+  function enfocar() {
+    if (!maquina || enfocada() || !puedeUsar()) return;
+    enfoque.meta = 1;
+    escena.classList.add("enfocando");
+    escena.classList.remove("sobre-dado");
+    TP()?.alEnfocar?.();
+  }
+
+  function salirDeEnfoque(inmediato) {
+    if (!enfocada() && !inmediato) return;
+    enfoque.meta = 0;
+    escena.classList.remove("enfocando", "sobre-palanca");
+    if (maquina) { const P = maquina.palanca; if (P.modo === "arrastre") P.modo = "libre"; }
+    if (inmediato) { enfoque.b = 0; aplicarCamara(); }
+    TP()?.alSalir?.();
+  }
+
+  /* ----- Rodillos, palanca y luces ----- */
+
+  const frenadoTP = (t) => { const s = 0.9; t -= 1; return 1 + (s + 1) * t * t * t + s * t * t; };
+  let alTerminarGiro = null;
+
+  function girarMaquina(resultado, alTerminar) {
+    if (!maquina) return;
+    const F = fichasTP().concat(window.TRAGAPERRAS ? window.TRAGAPERRAS.especiales.map((e) => ({ nombre: e.nombre, archivo: e.archivo, tipo: "especial" })) : []);
+    const P = maquina.palanca;
+    if (P.modo !== "tiron") P.modo = "tiron";
+    const ahora = performance.now();
+    maquina.rodillos.forEach((R, i) => {
+      const c = frenteTP(R), k = (c + N_CARAS / 2) % N_CARAS;   // la ficha de atrás trae el resultado
+      for (let j = 0; j < N_CARAS; j++) {
+        const dist = Math.min((j - c + N_CARAS) % N_CARAS, (c - j + N_CARAS) % N_CARAS);
+        if (j !== k && dist > 1) { R.fichas[j] = F[Math.floor(Math.random() * F.length)]; pintarFichaTP(R, j); }
+      }
+      R.fichas[k] = resultado[i]; pintarFichaTP(R, k);
+      const meta = R.ang + 2 * Math.PI * (2 + (i % 3) * 0.7 + Math.floor(i / 3) * 0.35);
+      const objetivo = (k + 0.5) * PASO_R;
+      const hasta = meta + ((((objetivo - meta) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
+      R.anim = { desde: R.ang, hasta, t0: ahora + 160, dur: 1150 + (i % 3) * 330 + Math.floor(i / 3) * 160 };
+    });
+    maquina.luces.modo = "girando";
+    maquina.brilloFila = [0, 0];
+    alTerminarGiro = alTerminar;
+  }
+
+  function celebrar(filas) {
+    if (!maquina) return;
+    if (filas.length) {
+      maquina.luces = { modo: "premio", hasta: performance.now() + 2600 };
+      filas.forEach((n) => { maquina.brilloFila[n] = 2.6; });
+    } else maquina.luces = { modo: "quieto", hasta: 0 };
+  }
+
+  function animarMaquina(dt) {
+    if (!maquina) return;
+    const M = maquina, ahora = performance.now();
+    if (rodillosSucios || !M.rodillos[0].fichas[0]) {
+      if (!M.rodillos[0].fichas[0]) llenarRodillos();
+      else M.rodillos.forEach((R) => { for (let k = 0; k < N_CARAS; k++) pintarFichaTP(R, k); });
+      rodillosSucios = false;
+    }
+
+    // cámara
+    const real = Math.min(0.12, (ahora - (enfoque.ultimo || ahora)) / 1000);   // tiempo real, no el del paso de física
+    enfoque.ultimo = ahora;
+    if (enfoque.b !== enfoque.meta) {
+      const paso = real / 1.15;
+      enfoque.b = enfoque.meta > enfoque.b ? Math.min(enfoque.meta, enfoque.b + paso) : Math.max(enfoque.meta, enfoque.b - paso);
+    }
+    if (enfoque.b > 0 || camara.position.distanceToSquared(camEscritorio.pos) > 1e-6) aplicarCamara();
+    const e = suave(enfoque.b);
+    mesaMadera.visible = e > 0.001;
+    mesaMadera.material.opacity = e;
+    luzFrente.intensity = 0.45 * e;
+    luzFrente.position.copy(camara.position);
+    luzFrente.target.position.set(M.p.x, 2, M.p.z);
+
+    // rodillos
+    let girando = 0;
+    M.rodillos.forEach((R) => {
+      if (!R.anim) return;
+      const t = Math.max(0, Math.min(1, (ahora - R.anim.t0) / R.anim.dur));
+      R.ang = R.anim.desde + (R.anim.hasta - R.anim.desde) * frenadoTP(t);
+      if (t >= 1) { R.ang = R.anim.hasta % (2 * Math.PI); R.anim = null; } else girando++;
+      R.malla.rotation.x = R.ang;
+    });
+    if (!girando && alTerminarGiro) { const f = alTerminarGiro; alTerminarGiro = null; f(); }
+
+    // palanca
+    const P = M.palanca;
+    if (P.modo === "tiron") {
+      P.ang += (PAL_TOPE + 0.05 - P.ang) * Math.min(1, dt * 16);
+      if (P.ang >= PAL_TOPE - 0.03) { P.modo = "libre"; P.vel = 0; }
+    } else if (P.modo === "libre") {
+      P.vel += (PAL_REPOSO - P.ang) * 70 * dt;
+      P.vel *= Math.exp(-6.5 * dt);
+      P.ang += P.vel * dt;
+    }
+    M.piv.rotation.x = P.ang;
+    M.pulsado = Math.max(0, M.pulsado - dt * 5);
+    M.boton.position.y = 1.13 - 0.06 * Math.min(1, M.pulsado);
+
+    // luces de la marquesina
+    if (M.luces.modo === "premio" && ahora > M.luces.hasta) M.luces.modo = "quieto";
+    const t = ahora / 1000;
+    M.lamparitas.forEach((mat, i) => {
+      let v;
+      if (M.luces.modo === "girando") v = ((Math.floor(t * 14) - i) % 3 + 3) % 3 === 0 ? 2.4 : 0.15;
+      else if (M.luces.modo === "premio") v = Math.floor(t * 6) % 2 ? 2.6 : 0.4;
+      else v = 0.35 + 0.25 * Math.sin(t * 2 + i * 0.9);
+      mat.emissiveIntensity = v;
+    });
+    M.marcos.forEach((mat, n) => {
+      M.brilloFila[n] = Math.max(0, M.brilloFila[n] - dt);
+      mat.emissiveIntensity = M.brilloFila[n] > 0 ? 0.6 + 0.6 * Math.sin(t * 12) : 0;
+    });
+  }
+
+  /* ----- Tocar la palanca y el botón cuando está enfocada ----- */
+
+  function piezaMaquina(x, y) {
+    if (!maquina) return null;
+    ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+    rayo.setFromCamera(ndc, camara);
+    const hit = rayo.intersectObjects([...maquina.piezasPalanca, maquina.boton], false)[0];
+    if (!hit) return null;
+    return hit.object === maquina.boton ? "boton" : "palanca";
+  }
+
+  const pedirTirada = () => TP()?.tirar?.();
+
+  addEventListener("pointerdown", (e) => {
+    if (!enfocada() || enfoque.b < 0.9 || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (e.target.closest?.("#tp-hud")) return;
+    const pieza = piezaMaquina(e.clientX, e.clientY);
+    if (!pieza) return;
+    e.preventDefault(); e.stopPropagation();
+    if (pieza === "boton") { maquina.pulsado = 1; pedirTirada(); return; }
+    const P = maquina.palanca;
+    P.modo = "arrastre";
+    P.arr = { id: e.pointerId, y0: e.clientY, a0: P.ang, movio: false };
+    escena.classList.add("agarrando");
+  }, true);
+
+  addEventListener("pointermove", (e) => {
+    if (!enfocada() || !maquina) return;
+    const P = maquina.palanca;
+    if (P.modo === "arrastre" && P.arr && e.pointerId === P.arr.id) {
+      const dy = e.clientY - P.arr.y0;
+      if (Math.abs(dy) > 4) P.arr.movio = true;
+      P.ang = Math.max(PAL_REPOSO, Math.min(PAL_TOPE, P.arr.a0 + (dy / (innerHeight * 0.26)) * (PAL_TOPE - PAL_REPOSO)));
+      return;
+    }
+    if (e.pointerType === "mouse" && enfoque.b > 0.9 && !e.target.closest?.("#tp-hud"))
+      escena.classList.toggle("sobre-palanca", !!piezaMaquina(e.clientX, e.clientY));
+  }, true);
+
+  const soltarPalanca = (e) => {
+    if (!maquina) return;
+    const P = maquina.palanca;
+    if (P.modo !== "arrastre" || (e && P.arr && e.pointerId !== P.arr.id)) return;
+    escena.classList.remove("agarrando");
+    const tirada = !P.arr.movio || P.ang > PAL_REPOSO + 0.6 * (PAL_TOPE - PAL_REPOSO);
+    P.modo = tirada ? "tiron" : "libre";
+    P.arr = null;
+    if (tirada) pedirTirada();
+  };
+  addEventListener("pointerup", soltarPalanca, true);
+  addEventListener("pointercancel", soltarPalanca, true);
+
+  /* =================================================================
      6. FÍSICA
      ================================================================= */
 
@@ -1164,6 +1623,7 @@ const Dados = (() => {
     camara.fov = 30;
     camara.updateProjectionMatrix();
     camara.updateMatrixWorld();   // sin esto, los rayos salen desde una cámara sin ubicar
+    camEscritorio.pos.copy(camara.position);
     const arribaIzq = aMesa(0, 0), abajoIzq = aMesa(0, innerHeight);
     const margen = 1.1;
     limites = {
@@ -1182,6 +1642,7 @@ const Dados = (() => {
     if (vela) empujarFuera(vela.p, RADIO_VELA - 0.2, true);
     cuerpos.forEach(despertar);
     necesitaDibujo = true;
+    if (enfoque.b > 0) aplicarCamara();   // con la máquina enfocada, la cámara sigue de frente
   }
 
   /* =================================================================
@@ -1196,7 +1657,7 @@ const Dados = (() => {
     !escena.classList.contains("leyendo") &&
     !document.getElementById("editor")?.classList.contains("visible") &&
     !document.getElementById("token")?.classList.contains("visible") &&
-    !document.getElementById("tp")?.classList.contains("visible");
+    enfoque.meta === 0 && enfoque.b === 0;
 
   function objetoBajo(x, y) {
     ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
@@ -1211,7 +1672,6 @@ const Dados = (() => {
 
   addEventListener("pointerdown", (e) => {
     if (sost || !puedeUsar() || (e.pointerType === "mouse" && e.button !== 0)) return;
-    if (e.target.closest?.(".mesa-objeto")) return;   // la tragaperras y la libreta tienen su propio clic
     const d = objetoBajo(e.clientX, e.clientY);
     if (!d) return;
     e.preventDefault(); e.stopPropagation();
@@ -1281,7 +1741,7 @@ const Dados = (() => {
       L.sostenido = false;
       sost = null;
       escena.classList.remove("agarrando");
-      if (toque && e) tocarLibro(e, L);
+      if (toque && e) { if (L.esMaquina) enfocar(); else tocarLibro(e, L); }
       return;
     }
     if (sost.vela) {
@@ -1554,6 +2014,7 @@ const Dados = (() => {
       for (let i = 0; i < SUBPASOS; i++) paso(h);
     }
     cuerpos.forEach((d) => { d.malla.position.copy(d.p); d.malla.quaternion.copy(d.q); });
+    animarMaquina(dt);
     render.render(mundo, camara);   // siempre: la llama titila
     necesitaDibujo = false;
   }
@@ -1570,8 +2031,14 @@ const Dados = (() => {
     vela = crearVela();
     const diario = crearLibro({ clave: "diario", titulo: "Diario de Rhazustión", sub: "Memorias de un caballero arcano", tema: "gastado", yaw: 0.24 });
     const registro = crearLibro({ clave: "registro", titulo: "Registro del DM", sub: "Crónica de La Torre", tema: "azul", yaw: -0.1 });
-    libros3d.push(diario, registro);
+    maquina = crearMaquina();
+    mesaMadera = crearMesaMadera();
+    luzFrente = new T.DirectionalLight(0xffe2bc, 0);
+    mundo.add(luzFrente, luzFrente.target);
+    libros3d.push(diario, registro, maquina);
     ajustarTamano();
+    // la tragaperras, a la derecha
+    aMesa(innerWidth * 0.8, innerHeight * 0.56, 0, maquina.p);
     // el diario, en el centro de la mesa; el registro, a su izquierda
     aMesa(innerWidth * 0.5, innerHeight * 0.53, 0, diario.p);
     aMesa(innerWidth * 0.26, innerHeight * 0.6, 0, registro.p);
@@ -1596,11 +2063,17 @@ const Dados = (() => {
   return {
     resultados: () => dados.map((d) => ({ tipo: d.tipo, valor: d.dormido ? resultado(d) : null })),
     // el título de la tapa del libro 3D (cambia si lo editan)
+    // la tragaperras 3D (la usa js/tragaperras.js)
+    maquina: {
+      girar: girarMaquina, celebrar, enfocar, salir: salirDeEnfoque,
+      get enfocada() { return enfocada(); },
+      margenes(m) { Object.assign(margenesTP, m); },
+    },
     ponerTitulo(t) { const L = libroPor("diario"); if (L) L.pintar(t); else tituloPendiente = t; },
     // para pruebas
     _interno: { dados, monedas, cuerpos, get vela() { return vela; }, aMesa, aPantalla, camara, render, moverVela, alternarVela,
       // avanza la física sin dibujar (para pruebas): devuelve los segundos simulados hasta que todo se detiene
       simular(max = 15) { const h = 1 / 60 / SUBPASOS; let t = 0; while (t < max && ocupados()) { for (let i = 0; i < SUBPASOS; i++) paso(h); t += 1 / 60; } necesitaDibujo = true; return t; },
-      get libro() { return libroPor("diario"); }, libros: libros3d, destinoMesa, get limites() { return limites; } },
+      get libro() { return libroPor("diario"); }, libros: libros3d, get maquina() { return maquina; }, frenteTP, destinoMesa, get limites() { return limites; } },
   };
 })();
