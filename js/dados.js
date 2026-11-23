@@ -1195,7 +1195,8 @@ const Dados = (() => {
     document.body.classList.contains("con-sesion") &&
     !escena.classList.contains("leyendo") &&
     !document.getElementById("editor")?.classList.contains("visible") &&
-    !document.getElementById("token")?.classList.contains("visible");
+    !document.getElementById("token")?.classList.contains("visible") &&
+    !document.getElementById("tp")?.classList.contains("visible");
 
   function objetoBajo(x, y) {
     ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
@@ -1210,6 +1211,7 @@ const Dados = (() => {
 
   addEventListener("pointerdown", (e) => {
     if (sost || !puedeUsar() || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (e.target.closest?.(".mesa-objeto")) return;   // la tragaperras y la libreta tienen su propio clic
     const d = objetoBajo(e.clientX, e.clientY);
     if (!d) return;
     e.preventDefault(); e.stopPropagation();
